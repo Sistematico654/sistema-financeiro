@@ -1,19 +1,32 @@
 <?php
 session_start();
-if (!isset($_SESSION['usuario_id'])) header("Location: login.php");
 require_once "conexao.php";
 
-// Total receitas
-$receitas = $conn->query("SELECT SUM(preco) as total FROM Produto")->fetch(PDO::FETCH_ASSOC);
-$receitasTotais = $receitas['total'] ?? 0;
+// Protege página
+if (!isset($_SESSION['usuario_id'])) header("Location: login.php");
 
-// Total custos
-$custos = $conn->query("SELECT SUM(valor) as total FROM Custo")->fetch(PDO::FETCH_ASSOC);
-$custosTotais = $custos['total'] ?? 0;
+// Receitas e custos
+$produtos = $conn->query("SELECT preco_venda, preco_custo, quantidade FROM Produto")->fetchAll(PDO::FETCH_ASSOC);
+$despesasFixas = $conn->query("SELECT SUM(valor) as total FROM Custo WHERE tipo='Fixa'")->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+$despesasVariaveis = $conn->query("SELECT SUM(valor) as total FROM Custo WHERE tipo='Variável'")->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
 
-// Ponto de equilíbrio
-$ponto = ($custosTotais > 0) ? $custosTotais : 0;
+// Soma receita total (preco_venda * quantidade)
+$receitaTotal = 0;
+$custoVariavelTotal = 0;
+foreach($produtos as $p){
+    $receitaTotal += $p['preco_venda'] * $p['quantidade'];
+    $custoVariavelTotal += $p['preco_custo'] * $p['quantidade'];
+}
+
+// Ponto de equilíbrio em quantidade
+$ponto = 0;
+$precoVendaMedio = count($produtos) ? array_sum(array_column($produtos,'preco_venda'))/count($produtos) : 0;
+$custoVariavelMedio = count($produtos) ? array_sum(array_column($produtos,'preco_custo'))/count($produtos) : 0;
+if(($precoVendaMedio - $custoVariavelMedio) > 0){
+    $ponto = $despesasFixas / ($precoVendaMedio - $custoVariavelMedio);
+}
 ?>
+
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -25,9 +38,10 @@ $ponto = ($custosTotais > 0) ? $custosTotais : 0;
 <div class="container mt-4">
     <h2>Ponto de Equilíbrio</h2>
     <div class="card p-4 bg-white">
-        <p><strong>Receitas Totais:</strong> R$ <?= number_format($receitasTotais,2,",",".") ?></p>
-        <p><strong>Custos Totais:</strong> R$ <?= number_format($custosTotais,2,",",".") ?></p>
-        <p><strong>Ponto de Equilíbrio:</strong> R$ <?= number_format($ponto,2,",",".") ?></p>
+        <p><strong>Receita Total:</strong> R$ <?= number_format($receitaTotal,2,",",".") ?></p>
+        <p><strong>Custo Fixo:</strong> R$ <?= number_format($despesasFixas,2,",",".") ?></p>
+        <p><strong>Custo Variável:</strong> R$ <?= number_format($custoVariavelTotal + $despesasVariaveis,2,",",".") ?></p>
+        <p><strong>Ponto de Equilíbrio (quantidade):</strong> <?= ceil($ponto) ?> produtos</p>
     </div>
     <a href="dashboard.php" class="btn btn-primary mt-3">Voltar ao Painel</a>
 </div>

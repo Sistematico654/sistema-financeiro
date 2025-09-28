@@ -1,10 +1,8 @@
 <?php
-session_start();
 require_once "conexao.php";
 
 $erro = "";
 
-// Verifica se já está logado
 if (isset($_SESSION['usuario_id'])) {
     header("Location: dashboard.php");
     exit;
@@ -14,13 +12,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $email = $_POST['email'];
     $senha = $_POST['senha'];
 
-    // Buscar usuário pelo email
     $stmt = $conn->prepare("SELECT * FROM Usuario WHERE email = :email");
     $stmt->bindParam(':email', $email);
     $stmt->execute();
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // Verifica se usuário existe e senha bate
     if ($user && password_verify($senha, $user['senha'])) {
         $_SESSION['usuario_id'] = $user['id'];
         $_SESSION['usuario_nome'] = $user['nome'];
@@ -31,7 +27,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -39,17 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <title>Login - Sistema Financeiro</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
-body {
-    background-color: #f7f9fc;
-}
-.card-login {
-    max-width: 400px;
-    margin: 80px auto;
-    padding: 30px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    border-radius: 12px;
-    background-color: #fff;
-}
+body { background-color: #f7f9fc; }
+.card-login { max-width: 400px; margin: 80px auto; padding: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 12px; background-color: #fff; }
 </style>
 </head>
 <body>

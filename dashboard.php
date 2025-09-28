@@ -1,18 +1,12 @@
 <?php
-if (session_status() == PHP_SESSION_NONE) {
-    session_start();
-}
-if (!isset($_SESSION['usuario_id'])) {
-    header("Location: login.php");
-    exit;
-}
+require_once "conexao.php";
+protegerPagina();
 ?>
-
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>Painel - Sistema Financeiro</title>
+<title>Dashboard - Sistema Financeiro</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
 body { background-color: #f7f9fc; }
@@ -28,7 +22,7 @@ body { background-color: #f7f9fc; }
         <div class="collapse navbar-collapse">
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item">
-                    <span class="nav-link">Olá, <?= $_SESSION['usuario_nome']; ?>!</span>
+                    <span class="nav-link">Olá, <?= $_SESSION['usuario_nome'] ?>!</span>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="logout.php">Sair</a>
@@ -37,38 +31,16 @@ body { background-color: #f7f9fc; }
         </div>
     </div>
 </nav>
-
 <div class="container">
     <div class="row">
-        <div class="col-md-6">
-            <div class="card p-4">
-                <h5>Cadastrar Produto</h5>
-                <a href="produtos.php" class="btn btn-primary">Acessar</a>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card p-4">
-                <h5>Cadastrar Despesa</h5>
-                <a href="custos.php" class="btn btn-primary">Acessar</a>
-            </div>
-        </div>
+        <div class="col-md-6"><div class="card p-4"><h5>Produtos</h5><a href="produtos.php" class="btn btn-primary w-100">Acessar</a></div></div>
+        <div class="col-md-6"><div class="card p-4"><h5>Despesas</h5><a href="custos.php" class="btn btn-primary w-100">Acessar</a></div></div>
     </div>
     <div class="row">
-        <div class="col-md-6">
-            <div class="card p-4">
-                <h5>Ponto de Equilíbrio</h5>
-                <a href="ponto.php" class="btn btn-primary">Calcular</a>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card p-4">
-                <h5>Relatórios</h5>
-                <a href="relatorios.php" class="btn btn-primary">Visualizar</a>
-            </div>
-        </div>
+        <div class="col-md-6"><div class="card p-4"><h5>Ponto de Equilíbrio</h5><a href="ponto.php" class="btn btn-primary w-100">Calcular</a></div></div>
+        <div class="col-md-6"><div class="card p-4"><h5>Relatórios</h5><a href="relatorios.php" class="btn btn-primary w-100">Visualizar</a></div></div>
     </div>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

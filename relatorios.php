@@ -1,11 +1,12 @@
 <?php
-session_start();
-if (!isset($_SESSION['usuario_id'])) header("Location: login.php");
 require_once "conexao.php";
+protegerPagina();
 
+// Obter dados dos produtos e despesas
 $produtos = $conn->query("SELECT nome, preco FROM Produto")->fetchAll(PDO::FETCH_ASSOC);
 $despesas = $conn->query("SELECT descricao, valor FROM Custo")->fetchAll(PDO::FETCH_ASSOC);
 
+// Preparar dados para Chart.js
 $produtosNomes = json_encode(array_column($produtos,'nome'));
 $produtosValores = json_encode(array_column($produtos,'preco'));
 $despesasDescricoes = json_encode(array_column($despesas,'descricao'));
@@ -31,6 +32,7 @@ $despesasValores = json_encode(array_column($despesas,'valor'));
         <h5>Despesas</h5>
         <canvas id="chartDespesas"></canvas>
     </div>
+    <button id="btnPdf" class="btn btn-danger mb-4">Exportar PDF</button>
     <a href="dashboard.php" class="btn btn-primary mb-4">Voltar ao Painel</a>
 </div>
 
@@ -40,7 +42,11 @@ new Chart(ctxProdutos, {
     type: 'bar',
     data: {
         labels: <?= $produtosNomes ?>,
-        datasets: [{ label: 'Preço (R$)', data: <?= $produtosValores ?>, backgroundColor: 'rgba(13,110,253,0.7)' }]
+        datasets: [{
+            label: 'Preço (R$)',
+            data: <?= $produtosValores ?>,
+            backgroundColor: 'rgba(13,110,253,0.7)'
+        }]
     }
 });
 
@@ -49,8 +55,32 @@ new Chart(ctxDespesas, {
     type: 'bar',
     data: {
         labels: <?= $despesasDescricoes ?>,
-        datasets: [{ label: 'Valor (R$)', data: <?= $despesasValores ?>, backgroundColor: 'rgba(220,53,69,0.7)' }]
+        datasets: [{
+            label: 'Valor (R$)',
+            data: <?= $despesasValores ?>,
+            backgroundColor: 'rgba(220,53,69,0.7)'
+        }]
     }
+});
+
+// Exportar PDF
+document.getElementById('btnPdf').addEventListener('click', () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.text("Relatório de Produtos e Despesas", 10, 10);
+
+    doc.text("Produtos:", 10, 20);
+    <?= $produtosNomes ?>.forEach((nome, i) => {
+        doc.text(`${nome}: R$ ${<?= $produtosValores ?>}[i]`, 10, 30 + i*10);
+    });
+
+    let offset = 30 + <?= count($produtos) ?> * 10;
+    doc.text("Despesas:", 10, offset);
+    <?= $despesasDescricoes ?>.forEach((desc, i) => {
+        doc.text(`${desc}: R$ ${<?= $despesasValores ?>}[i]`, 10, offset + 10 + i*10);
+    });
+
+    doc.save("relatorio.pdf");
 });
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

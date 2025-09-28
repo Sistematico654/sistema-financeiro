@@ -1,27 +1,27 @@
 <?php
-session_start();
-if (!isset($_SESSION['usuario_id'])) header("Location: login.php");
 require_once "conexao.php";
+protegerPagina();
 
 // Inserir ou atualizar despesa
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $id = $_POST['id'] ?? null; // Para edição
+    $tipo = $_POST['tipo'];
     $descricao = $_POST['descricao'];
     $valor = $_POST['valor'];
 
     if ($id) {
         // Atualizar
-        $stmt = $conn->prepare("UPDATE Custo SET descricao = :descricao, valor = :valor WHERE id = :id");
+        $stmt = $conn->prepare("UPDATE Custo SET tipo=:tipo, descricao=:descricao, valor=:valor WHERE id=:id");
         $stmt->bindParam(':id', $id);
     } else {
         // Inserir
-        $stmt = $conn->prepare("INSERT INTO Custo (descricao, valor) VALUES (:descricao, :valor)");
+        $stmt = $conn->prepare("INSERT INTO Custo (tipo, descricao, valor) VALUES (:tipo, :descricao, :valor)");
     }
+    $stmt->bindParam(':tipo', $tipo);
     $stmt->bindParam(':descricao', $descricao);
     $stmt->bindParam(':valor', $valor);
     $stmt->execute();
     header("Location: custos.php");
-    exit;
 }
 
 // Deletar despesa
@@ -29,7 +29,6 @@ if (isset($_GET['delete'])) {
     $id = $_GET['delete'];
     $conn->prepare("DELETE FROM Custo WHERE id = ?")->execute([$id]);
     header("Location: custos.php");
-    exit;
 }
 
 // Buscar despesa para editar
@@ -49,20 +48,25 @@ $despesas = $conn->query("SELECT * FROM Custo")->fetchAll(PDO::FETCH_ASSOC);
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>Despesas - Sistema Financeiro</title>
+<title>Custos e Despesas - Sistema Financeiro</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
 <div class="container mt-4">
-    <h2>Custos Fixos e Variáveis</h2>
-
-    <!-- Formulário de Adicionar/Editar -->
+    <h2>Custos e Despesas</h2>
     <form method="post" class="row g-3 mb-4">
         <input type="hidden" name="id" value="<?= $editarDespesa['id'] ?? '' ?>">
+        <div class="col-md-2">
+            <select name="tipo" class="form-control" required>
+                <option value="">Tipo</option>
+                <option value="Fixa" <?= isset($editarDespesa['tipo']) && $editarDespesa['tipo']=='Fixa'?'selected':'' ?>>Fixa</option>
+                <option value="Variável" <?= isset($editarDespesa['tipo']) && $editarDespesa['tipo']=='Variável'?'selected':'' ?>>Variável</option>
+            </select>
+        </div>
         <div class="col-md-6">
             <input type="text" name="descricao" placeholder="Descrição" class="form-control" value="<?= $editarDespesa['descricao'] ?? '' ?>" required>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-2">
             <input type="number" step="0.01" name="valor" placeholder="Valor" class="form-control" value="<?= $editarDespesa['valor'] ?? '' ?>" required>
         </div>
         <div class="col-md-2">
@@ -70,22 +74,19 @@ $despesas = $conn->query("SELECT * FROM Custo")->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </form>
 
-    <!-- Tabela de despesas -->
     <table class="table table-bordered bg-white">
         <thead class="table-light">
             <tr>
-                <th>ID</th>
-                <th>Descrição</th>
-                <th>Valor (R$)</th>
-                <th>Ações</th>
+                <th>ID</th><th>Tipo</th><th>Descrição</th><th>Valor</th><th>Ações</th>
             </tr>
         </thead>
         <tbody>
             <?php foreach($despesas as $d): ?>
             <tr>
                 <td><?= $d['id'] ?></td>
+                <td><?= $d['tipo'] ?></td>
                 <td><?= $d['descricao'] ?></td>
-                <td><?= number_format($d['valor'], 2, ",", ".") ?></td>
+                <td>R$ <?= number_format($d['valor'],2,",",".") ?></td>
                 <td>
                     <a href="?edit=<?= $d['id'] ?>" class="btn btn-primary btn-sm">Editar</a>
                     <a href="?delete=<?= $d['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('Deseja realmente deletar?')">Deletar</a>
