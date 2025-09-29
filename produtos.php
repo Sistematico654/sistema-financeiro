@@ -1,29 +1,31 @@
 <?php
 require_once "conexao.php";
 protegerPagina();
+$usuario_id = $_SESSION['usuario_id'];
 
 // Inserir ou atualizar produto
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $id = $_POST['id'] ?? null;
     $nome = $_POST['nome'];
-    $categoria = $_POST['categoria'];
+    $categoria = $_POST['categoria'] ?? null;
     $preco_custo = $_POST['preco_custo'];
     $preco_venda = $_POST['preco_venda'];
     $quantidade = $_POST['quantidade'];
 
     if ($id) {
         // Atualizar
-        $stmt = $conn->prepare("UPDATE Produto SET nome=:nome, categoria=:categoria, preco_custo=:preco_custo, preco_venda=:preco_venda, quantidade=:quantidade WHERE id=:id");
+        $stmt = $conn->prepare("UPDATE Produto SET nome=:nome, categoria=:categoria, preco_custo=:preco_custo, preco_venda=:preco_venda, quantidade=:quantidade WHERE id=:id AND usuario_id=:usuario_id");
         $stmt->bindParam(':id', $id);
     } else {
         // Inserir
-        $stmt = $conn->prepare("INSERT INTO Produto (nome, categoria, preco_custo, preco_venda, quantidade) VALUES (:nome, :categoria, :preco_custo, :preco_venda, :quantidade)");
+        $stmt = $conn->prepare("INSERT INTO Produto (nome, categoria, preco_custo, preco_venda, quantidade, usuario_id) VALUES (:nome, :categoria, :preco_custo, :preco_venda, :quantidade, :usuario_id)");
     }
     $stmt->bindParam(':nome', $nome);
     $stmt->bindParam(':categoria', $categoria);
     $stmt->bindParam(':preco_custo', $preco_custo);
     $stmt->bindParam(':preco_venda', $preco_venda);
     $stmt->bindParam(':quantidade', $quantidade);
+    $stmt->bindParam(':usuario_id', $usuario_id);
     $stmt->execute();
     header("Location: produtos.php");
 }
@@ -31,7 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 // Deletar produto
 if (isset($_GET['delete'])) {
     $id = $_GET['delete'];
-    $conn->prepare("DELETE FROM Produto WHERE id = ?")->execute([$id]);
+    $stmt = $conn->prepare("DELETE FROM Produto WHERE id = ? AND usuario_id = ?");
+    $stmt->execute([$id, $usuario_id]);
     header("Location: produtos.php");
 }
 
@@ -39,13 +42,15 @@ if (isset($_GET['delete'])) {
 $editarProduto = null;
 if (isset($_GET['edit'])) {
     $id = $_GET['edit'];
-    $stmt = $conn->prepare("SELECT * FROM Produto WHERE id = ?");
-    $stmt->execute([$id]);
+    $stmt = $conn->prepare("SELECT * FROM Produto WHERE id = ? AND usuario_id = ?");
+    $stmt->execute([$id, $usuario_id]);
     $editarProduto = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
-// Listar produtos
-$produtos = $conn->query("SELECT * FROM Produto")->fetchAll(PDO::FETCH_ASSOC);
+// Listar produtos do usuário
+$stmt = $conn->prepare("SELECT * FROM Produto WHERE usuario_id = ?");
+$stmt->execute([$usuario_id]);
+$produtos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>

@@ -1,12 +1,13 @@
 <?php
 require_once "conexao.php";
 
-$erro = "";
-
+// Se já estiver logado, redireciona para o dashboard
 if (isset($_SESSION['usuario_id'])) {
     header("Location: dashboard.php");
     exit;
 }
+
+$erro = "";
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $email = $_POST['email'];
@@ -18,6 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($user && password_verify($senha, $user['senha'])) {
+        // Login correto
         $_SESSION['usuario_id'] = $user['id'];
         $_SESSION['usuario_nome'] = $user['nome'];
         header("Location: dashboard.php");

@@ -1,29 +1,40 @@
 <?php
-session_start();
 require_once "conexao.php";
+protegerPagina();
 
-// Protege página
-if (!isset($_SESSION['usuario_id'])) header("Location: login.php");
+$usuario_id = $_SESSION['usuario_id'];
 
-// Receitas e custos
-$produtos = $conn->query("SELECT preco_venda, preco_custo, quantidade FROM Produto")->fetchAll(PDO::FETCH_ASSOC);
-$despesasFixas = $conn->query("SELECT SUM(valor) as total FROM Custo WHERE tipo='Fixa'")->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
-$despesasVariaveis = $conn->query("SELECT SUM(valor) as total FROM Custo WHERE tipo='Variável'")->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+// Buscar produtos do usuário
+$produtos = $conn->prepare("SELECT preco_venda, preco_custo, quantidade FROM Produto WHERE usuario_id = ?");
+$produtos->execute([$usuario_id]);
+$produtos = $produtos->fetchAll(PDO::FETCH_ASSOC);
 
-// Soma receita total (preco_venda * quantidade)
+// Buscar despesas fixas e variáveis do usuário
+$despesasFixas = $conn->prepare("SELECT SUM(valor) as total FROM Custo WHERE tipo='Fixa' AND usuario_id = ?");
+$despesasFixas->execute([$usuario_id]);
+$despesasFixas = $despesasFixas->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+
+$despesasVariaveisExternas = $conn->prepare("SELECT SUM(valor) as total FROM Custo WHERE tipo='Variavel' AND usuario_id = ?");
+$despesasVariaveisExternas->execute([$usuario_id]);
+$despesasVariaveisExternas = $despesasVariaveisExternas->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+
+// Calcular receita total e custo variável dos produtos
 $receitaTotal = 0;
-$custoVariavelTotal = 0;
+$custoVariavelProdutos = 0;
 foreach($produtos as $p){
     $receitaTotal += $p['preco_venda'] * $p['quantidade'];
-    $custoVariavelTotal += $p['preco_custo'] * $p['quantidade'];
+    $custoVariavelProdutos += $p['preco_custo'] * $p['quantidade'];
 }
 
+// Custo total (produtos + despesas variáveis externas + fixas)
+$custoTotal = $custoVariavelProdutos + $despesasVariaveisExternas + $despesasFixas;
+
 // Ponto de equilíbrio em quantidade
-$ponto = 0;
 $precoVendaMedio = count($produtos) ? array_sum(array_column($produtos,'preco_venda'))/count($produtos) : 0;
 $custoVariavelMedio = count($produtos) ? array_sum(array_column($produtos,'preco_custo'))/count($produtos) : 0;
+$ponto = 0;
 if(($precoVendaMedio - $custoVariavelMedio) > 0){
-    $ponto = $despesasFixas / ($precoVendaMedio - $custoVariavelMedio);
+    $ponto = ceil(($despesasFixas + $despesasVariaveisExternas) / ($precoVendaMedio - $custoVariavelMedio));
 }
 ?>
 
@@ -40,8 +51,8 @@ if(($precoVendaMedio - $custoVariavelMedio) > 0){
     <div class="card p-4 bg-white">
         <p><strong>Receita Total:</strong> R$ <?= number_format($receitaTotal,2,",",".") ?></p>
         <p><strong>Custo Fixo:</strong> R$ <?= number_format($despesasFixas,2,",",".") ?></p>
-        <p><strong>Custo Variável:</strong> R$ <?= number_format($custoVariavelTotal + $despesasVariaveis,2,",",".") ?></p>
-        <p><strong>Ponto de Equilíbrio (quantidade):</strong> <?= ceil($ponto) ?> produtos</p>
+        <p><strong>Custo Variável (produtos + despesas variáveis):</strong> R$ <?= number_format($custoVariavelProdutos + $despesasVariaveisExternas,2,",",".") ?></p>
+        <p><strong>Ponto de Equilíbrio (quantidade de produtos):</strong> <?= $ponto ?> unidades</p>
     </div>
     <a href="dashboard.php" class="btn btn-primary mt-3">Voltar ao Painel</a>
 </div>
