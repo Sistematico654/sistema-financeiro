@@ -4,12 +4,11 @@ protegerPagina();
 
 $usuario_id = $_SESSION['usuario_id'];
 
-// Buscar produtos do usuário
+// Buscar produtos e custos
 $produtosStmt = $conn->prepare("SELECT * FROM Produto WHERE usuario_id = ? ORDER BY nome ASC");
 $produtosStmt->execute([$usuario_id]);
 $produtos = $produtosStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Buscar custos/despesas
 $despesasStmt = $conn->prepare("SELECT * FROM Custo WHERE usuario_id = ? ORDER BY descricao ASC");
 $despesasStmt->execute([$usuario_id]);
 $despesas = $despesasStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -38,16 +37,9 @@ foreach ($produtos as $p) {
         }
     }
 
-    // Custo variável total inclui o preço de custo do estoque
     $custoVariavelTotal = $custoVariavel + ($preco_custo * $quantidade);
-
-    // Receita total (para estoque atual)
     $receitaTotal = $preco_venda * $quantidade;
-
-    // Margem por unidade (preço de venda - custo unitário)
     $margemUnidade = $preco_venda - $preco_custo;
-
-    // Ponto de equilíbrio (unidades) considerando apenas despesas fixas + variáveis (sem estoque)
     $despesasTotaisParaPE = $custoFixo + $custoVariavel; 
     $pontoEquilibrio = $margemUnidade > 0 ? ceil($despesasTotaisParaPE / $margemUnidade) : 0;
 
@@ -59,6 +51,11 @@ foreach ($produtos as $p) {
         'pontoEquilibrio' => $pontoEquilibrio
     ];
 }
+
+$labels = array_map(fn($d) => $d['produto'], $dadosTabela);
+$custoFixoData = array_map(fn($d) => $d['custoFixo'], $dadosTabela);
+$custoVariavelData = array_map(fn($d) => $d['custoVariavel'], $dadosTabela);
+$receitaTotalData = array_map(fn($d) => $d['receitaTotal'], $dadosTabela);
 ?>
 
 <!DOCTYPE html>
@@ -71,20 +68,23 @@ foreach ($produtos as $p) {
 </head>
 <body class="bg-light">
 <div class="container mt-4">
-    <h2>Ponto de Equilíbrio por Produto</h2>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Ponto de Equilíbrio por Produto</h2>
+        <a href="dashboard.php" class="btn btn-primary">Voltar ao Painel</a>
+    </div>
 
     <!-- Gráfico -->
     <div class="bg-white p-3 mb-4 border rounded">
-        <canvas id="grafico" height="100"></canvas>
+        <canvas id="graficoPE" height="100"></canvas>
     </div>
 
     <!-- Tabela -->
-    <table class="table table-bordered bg-white mt-4">
+    <table class="table table-bordered bg-white">
         <thead class="table-light">
             <tr>
                 <th>Produto</th>
                 <th>Custo Fixo</th>
-                <th>Custo Variável Total</th>
+                <th>Custo Variável</th>
                 <th>Receita Total</th>
                 <th>Ponto de Equilíbrio (unidades)</th>
             </tr>
@@ -101,34 +101,21 @@ foreach ($produtos as $p) {
             <?php endforeach; ?>
         </tbody>
     </table>
-
-    <div class="mt-3">
-        <a href="dashboard.php" class="btn btn-primary">Voltar ao Painel</a>
-    </div>
 </div>
 
 <script>
-const ctx = document.getElementById('grafico').getContext('2d');
-const labels = <?= json_encode(array_column($dadosTabela, 'produto')) ?>;
-const custoFixoData = <?= json_encode(array_column($dadosTabela, 'custoFixo')) ?>;
-const custoVariavelData = <?= json_encode(array_column($dadosTabela, 'custoVariavel')) ?>;
-const receitaData = <?= json_encode(array_column($dadosTabela, 'receitaTotal')) ?>;
-
+const ctx = document.getElementById('graficoPE').getContext('2d');
 new Chart(ctx, {
     type: 'bar',
     data: {
-        labels: labels,
+        labels: <?= json_encode($labels) ?>,
         datasets: [
-            { label: 'Custo Fixo', data: custoFixoData, backgroundColor: 'rgba(255, 99, 132, 0.7)' },
-            { label: 'Custo Variável Total', data: custoVariavelData, backgroundColor: 'rgba(54, 162, 235, 0.7)' },
-            { label: 'Receita Total', data: receitaData, backgroundColor: 'rgba(75, 192, 192, 0.7)' }
+            { label: 'Custo Fixo', data: <?= json_encode($custoFixoData) ?>, backgroundColor: 'rgba(255, 99, 132, 0.7)' },
+            { label: 'Custo Variável total', data: <?= json_encode($custoVariavelData) ?>, backgroundColor: 'rgba(54, 162, 235, 0.7)' },
+            { label: 'Receita Total', data: <?= json_encode($receitaTotalData) ?>, backgroundColor: 'rgba(75, 192, 192, 0.7)' }
         ]
     },
-    options: {
-        responsive: true,
-        plugins: { legend: { position: 'top' } },
-        scales: { y: { beginAtZero: true } }
-    }
+    options: { responsive: true, scales: { y: { beginAtZero: true } } }
 });
 </script>
 

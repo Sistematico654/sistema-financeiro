@@ -66,7 +66,11 @@ foreach ($produtos as $p) {
 </head>
 <body class="bg-light">
 <div class="container mt-4">
-    <h2>Relatório de Viabilidade por Produto</h2>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Relatório de Viabilidade por Produto</h2>
+        <a href="dashboard.php" class="btn btn-primary">Voltar ao Painel</a>
+    </div>
 
     <!-- Gráfico -->
     <div class="bg-white p-3 mb-4 border rounded">
@@ -95,9 +99,6 @@ foreach ($produtos as $p) {
         </tbody>
     </table>
 
-    <div class="mt-3">
-        <a href="dashboard.php" class="btn btn-primary">Voltar ao Painel</a>
-    </div>
 </div>
 
 <script>

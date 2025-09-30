@@ -1,7 +1,7 @@
 <?php
 require_once "conexao.php";
 protegerPagina();
-$nomeUsuario = $_SESSION['usuario_nome'] ?? "Usuário"; // Assumindo que você salvou o nome na sessão
+$nomeUsuario = $_SESSION['usuario_nome'] ?? "Usuário";
 ?>
 
 <!DOCTYPE html>
@@ -18,10 +18,12 @@ $nomeUsuario = $_SESSION['usuario_nome'] ?? "Usuário"; // Assumindo que você s
     .card-dashboard {
         transition: transform 0.2s;
         cursor: pointer;
-        min-height: 180px;
+        min-height: 220px; /* Garante altura uniforme */
         display: flex;
         flex-direction: column;
         justify-content: center;
+        align-items: center;
+        text-align: center;
     }
     .card-dashboard:hover {
         transform: translateY(-5px);
@@ -40,6 +42,9 @@ $nomeUsuario = $_SESSION['usuario_nome'] ?? "Usuário"; // Assumindo que você s
         font-size: 0.9rem;
         padding: 0.3rem 0.8rem;
     }
+    .card-body p {
+        margin: 0;
+    }
 </style>
 </head>
 <body>
@@ -55,9 +60,9 @@ $nomeUsuario = $_SESSION['usuario_nome'] ?? "Usuário"; // Assumindo que você s
 
         <!-- Produtos -->
         <div class="col-md-3">
-            <a href="produtos.php" class="text-decoration-none text-dark">
-                <div class="card card-dashboard shadow-sm text-center p-3 bg-primary text-white">
-                    <div class="card-body d-flex flex-column justify-content-center">
+            <a href="produtos.php" class="text-decoration-none text-dark h-100">
+                <div class="card card-dashboard shadow-sm bg-primary text-white w-100 h-100">
+                    <div class="card-body d-flex flex-column justify-content-center align-items-center">
                         <i class="fas fa-box card-icon mb-2"></i>
                         <h5 class="card-title">Produtos</h5>
                         <p class="card-text">Gerencie seus produtos</p>
@@ -68,9 +73,9 @@ $nomeUsuario = $_SESSION['usuario_nome'] ?? "Usuário"; // Assumindo que você s
 
         <!-- Custos -->
         <div class="col-md-3">
-            <a href="custos.php" class="text-decoration-none text-dark">
-                <div class="card card-dashboard shadow-sm text-center p-3 bg-warning text-dark">
-                    <div class="card-body d-flex flex-column justify-content-center">
+            <a href="custos.php" class="text-decoration-none text-dark h-100">
+                <div class="card card-dashboard shadow-sm bg-warning text-dark w-100 h-100">
+                    <div class="card-body d-flex flex-column justify-content-center align-items-center">
                         <i class="fas fa-dollar-sign card-icon mb-2"></i>
                         <h5 class="card-title">Custos / Despesas</h5>
                         <p class="card-text">Adicione ou edite custos</p>
@@ -81,9 +86,9 @@ $nomeUsuario = $_SESSION['usuario_nome'] ?? "Usuário"; // Assumindo que você s
 
         <!-- Ponto de Equilíbrio -->
         <div class="col-md-3">
-            <a href="ponto.php" class="text-decoration-none text-dark">
-                <div class="card card-dashboard shadow-sm text-center p-3 bg-success text-white">
-                    <div class="card-body d-flex flex-column justify-content-center">
+            <a href="ponto.php" class="text-decoration-none text-dark h-100">
+                <div class="card card-dashboard shadow-sm bg-success text-white w-100 h-100">
+                    <div class="card-body d-flex flex-column justify-content-center align-items-center">
                         <i class="fas fa-balance-scale card-icon mb-2"></i>
                         <h5 class="card-title">Ponto de Equilíbrio</h5>
                         <p class="card-text">Visualize o equilíbrio de seus produtos</p>
@@ -94,9 +99,9 @@ $nomeUsuario = $_SESSION['usuario_nome'] ?? "Usuário"; // Assumindo que você s
 
         <!-- Relatório -->
         <div class="col-md-3">
-            <a href="relatorio.php" class="text-decoration-none text-dark">
-                <div class="card card-dashboard shadow-sm text-center p-3 bg-info text-white">
-                    <div class="card-body d-flex flex-column justify-content-center">
+            <a href="relatorio.php" class="text-decoration-none text-dark h-100">
+                <div class="card card-dashboard shadow-sm bg-info text-white w-100 h-100">
+                    <div class="card-body d-flex flex-column justify-content-center align-items-center">
                         <i class="fas fa-chart-bar card-icon mb-2"></i>
                         <h5 class="card-title">Relatório</h5>
                         <p class="card-text">Confira a viabilidade das vendas</p>

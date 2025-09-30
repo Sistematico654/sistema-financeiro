@@ -23,17 +23,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($id) {
-        $stmt = $conn->prepare("
-            UPDATE Custo 
-            SET descricao = :descricao, valor = :valor, tipo = :tipo, produto_id = :produto_id
-            WHERE id = :id AND usuario_id = :usuario_id
-        ");
+        $stmt = $conn->prepare("UPDATE Custo SET descricao = :descricao, valor = :valor, tipo = :tipo, produto_id = :produto_id WHERE id = :id AND usuario_id = :usuario_id");
         $stmt->bindValue(':id', $id, PDO::PARAM_INT);
     } else {
-        $stmt = $conn->prepare("
-            INSERT INTO Custo (descricao, valor, tipo, usuario_id, produto_id) 
-            VALUES (:descricao, :valor, :tipo, :usuario_id, :produto_id)
-        ");
+        $stmt = $conn->prepare("INSERT INTO Custo (descricao, valor, tipo, usuario_id, produto_id) VALUES (:descricao, :valor, :tipo, :usuario_id, :produto_id)");
     }
 
     $stmt->bindValue(':descricao', $descricao, PDO::PARAM_STR);
@@ -70,13 +63,7 @@ if (isset($_GET['edit'])) {
 }
 
 // Listar todos os custos/despesas do usuário
-$stmt = $conn->prepare("
-    SELECT C.*, P.nome AS produto_nome, P.preco_custo, P.qtd 
-    FROM Custo C 
-    LEFT JOIN Produto P ON C.produto_id = P.id 
-    WHERE C.usuario_id = ?
-    ORDER BY produto_nome ASC, C.id DESC
-");
+$stmt = $conn->prepare("SELECT C.*, P.nome AS produto_nome, P.preco_custo, P.qtd FROM Custo C LEFT JOIN Produto P ON C.produto_id = P.id WHERE C.usuario_id = ? ORDER BY produto_nome ASC, C.id DESC");
 $stmt->execute([$usuario_id]);
 $despesas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -86,7 +73,6 @@ foreach ($produtos as $p) {
     $produto_id = $p['id'];
     $totaisPorProduto[$produto_id] = floatval($p['preco_custo']) * intval($p['qtd']);
 }
-
 foreach ($despesas as $d) {
     if ($d['produto_id']) {
         $totaisPorProduto[$d['produto_id']] += floatval($d['valor']);
@@ -104,7 +90,12 @@ foreach ($despesas as $d) {
 </head>
 <body class="bg-light">
 <div class="container mt-4">
-    <h2>Custos / Despesas</h2>
+
+    <!-- Cabeçalho com botão no topo direito -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Custos / Despesas</h2>
+        <a href="dashboard.php" class="btn btn-primary">Voltar ao Painel</a>
+    </div>
 
     <?php if(isset($_GET['erro']) && $_GET['erro'] === 'tipo_invalido'): ?>
         <div class="alert alert-warning">Selecione um tipo válido de custo.</div>
@@ -140,7 +131,7 @@ foreach ($despesas as $d) {
             </select>
         </div>
 
-        <div class="col-md-2">
+        <div class="col-md-2 d-flex justify-content-center">
             <button type="submit" class="btn btn-success w-100"><?= $editarCusto ? 'Atualizar' : 'Adicionar' ?></button>
         </div>
     </form>
@@ -178,8 +169,6 @@ foreach ($despesas as $d) {
             <?php endforeach; ?>
         </tbody>
     </table>
-
-    <a href="dashboard.php" class="btn btn-primary mt-3">Voltar ao Painel</a>
 </div>
 
 <script>
@@ -194,7 +183,7 @@ new Chart(ctx, {
         datasets: [{
             label: 'Custo Total (Produto + Custos)',
             data: dataTotais,
-            backgroundColor: 'rgba(255, 99, 132, 0.7)'
+            backgroundColor: 'rgba(54, 162, 235, 0.7)'
         }]
     },
     options: { responsive: true, scales: { y: { beginAtZero: true } } }

@@ -88,7 +88,12 @@ foreach ($produtos as $p) {
 </head>
 <body class="bg-light">
 <div class="container mt-4">
-    <h2>Produtos</h2>
+
+    <!-- Cabeçalho com botão no topo direito -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Produtos</h2>
+        <a href="dashboard.php" class="btn btn-primary">Voltar ao Painel</a>
+    </div>
 
     <form method="post" class="row g-3 mb-4">
         <input type="hidden" name="id" value="<?= $editarProduto['id'] ?? '' ?>">
@@ -113,7 +118,7 @@ foreach ($produtos as $p) {
             <input type="number" name="qtd" placeholder="Quantidade" class="form-control" value="<?= htmlspecialchars($editarProduto['qtd'] ?? '') ?>" required>
         </div>
 
-        <div class="col-md-2">
+        <div class="col-md-2 d-flex justify-content-center">
             <button type="submit" class="btn btn-success w-100"><?= $editarProduto ? 'Atualizar' : 'Adicionar' ?></button>
         </div>
     </form>
@@ -152,8 +157,6 @@ foreach ($produtos as $p) {
             <?php endforeach; ?>
         </tbody>
     </table>
-
-    <a href="dashboard.php" class="btn btn-primary mt-3">Voltar ao Painel</a>
 </div>
 
 <script>
@@ -177,9 +180,7 @@ new Chart(ctx, {
     },
     options: {
         responsive: true,
-        scales: {
-            y: { beginAtZero: true }
-        }
+        scales: { y: { beginAtZero: true } }
     }
 });
 </script>
