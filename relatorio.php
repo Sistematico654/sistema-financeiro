@@ -4,7 +4,7 @@ protegerPagina();
 
 $usuario_id = $_SESSION['usuario_id'];
 
-// Buscar produtos e custos do usuário
+// Buscar produtos e custos
 $produtosStmt = $conn->prepare("SELECT * FROM Produto WHERE usuario_id = ?");
 $produtosStmt->execute([$usuario_id]);
 $produtos = $produtosStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -13,7 +13,7 @@ $despesasStmt = $conn->prepare("SELECT * FROM Custo WHERE usuario_id = ?");
 $despesasStmt->execute([$usuario_id]);
 $despesas = $despesasStmt->fetchAll(PDO::FETCH_ASSOC);
 
-$resultados = [];
+$dadosGrafico = [];
 
 foreach ($produtos as $p) {
     $id = $p['id'];
@@ -44,17 +44,12 @@ foreach ($produtos as $p) {
     }
 
     $receitaTotal = $preco_venda * $quantidade;
-    $custoVariavelUnitario = $custoVariavel / $quantidade;
-    $pontoEquilibrio = ($preco_venda - $custoVariavelUnitario) > 0
-        ? ceil($custoFixo / ($preco_venda - $custoVariavelUnitario))
-        : 0;
+    $custoTotal = $custoFixo + $custoVariavel;
 
-    $resultados[] = [
+    $dadosGrafico[] = [
         'produto' => $nome,
         'receita' => $receitaTotal,
-        'custoFixo' => $custoFixo,
-        'custoVariavel' => $custoVariavel,
-        'ponto' => $pontoEquilibrio
+        'custoTotal' => $custoTotal
     ];
 }
 ?>
@@ -63,36 +58,70 @@ foreach ($produtos as $p) {
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>Ponto de Equilíbrio - Sistema Financeiro</title>
+<title>Relatório de Viabilidade - Sistema Financeiro</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
 <div class="container mt-4">
-    <h2>Ponto de Equilíbrio por Produto</h2>
-    <table class="table table-bordered bg-white">
+    <h2>Relatório de Viabilidade por Produto</h2>
+
+    <canvas id="grafico" height="100"></canvas>
+
+    <table class="table table-bordered bg-white mt-4">
         <thead class="table-light">
             <tr>
                 <th>Produto</th>
                 <th>Receita Total</th>
-                <th>Custo Fixo</th>
-                <th>Custo Variável</th>
-                <th>Ponto de Equilíbrio (unidades)</th>
+                <th>Custo Total</th>
             </tr>
         </thead>
         <tbody>
-            <?php foreach($resultados as $r): ?>
+            <?php foreach($dadosGrafico as $d): ?>
             <tr>
-                <td><?= htmlspecialchars($r['produto']) ?></td>
-                <td>R$ <?= number_format($r['receita'],2,",",".") ?></td>
-                <td>R$ <?= number_format($r['custoFixo'],2,",",".") ?></td>
-                <td>R$ <?= number_format($r['custoVariavel'],2,",",".") ?></td>
-                <td><?= $r['ponto'] ?></td>
+                <td><?= htmlspecialchars($d['produto']) ?></td>
+                <td>R$ <?= number_format($d['receita'],2,",",".") ?></td>
+                <td>R$ <?= number_format($d['custoTotal'],2,",",".") ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>
     </table>
+
     <a href="dashboard.php" class="btn btn-primary mt-3">Voltar ao Painel</a>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+const ctx = document.getElementById('grafico').getContext('2d');
+const labels = <?= json_encode(array_column($dadosGrafico, 'produto')) ?>;
+const receitaData = <?= json_encode(array_column($dadosGrafico, 'receita')) ?>;
+const custoTotalData = <?= json_encode(array_column($dadosGrafico, 'custoTotal')) ?>;
+
+const grafico = new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: labels,
+        datasets: [
+            {
+                label: 'Receita Total',
+                data: receitaData,
+                backgroundColor: 'rgba(54, 162, 235, 0.7)'
+            },
+            {
+                label: 'Custo Total',
+                data: custoTotalData,
+                backgroundColor: 'rgba(255, 99, 132, 0.7)'
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+</script>
 </body>
 </html>

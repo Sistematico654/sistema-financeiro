@@ -10,24 +10,26 @@ CREATE TABLE IF NOT EXISTS Usuario (
     senha VARCHAR(255) NOT NULL
 );
 
--- Tabela de produtos (ligada ao usuário)
+-- Tabela de produtos
 CREATE TABLE IF NOT EXISTS Produto (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
+    categoria VARCHAR(100),
     preco_custo DECIMAL(10,2) NOT NULL,
     preco_venda DECIMAL(10,2) NOT NULL,
     quantidade INT NOT NULL,
-    categoria VARCHAR(100),
     usuario_id INT NOT NULL,
     FOREIGN KEY (usuario_id) REFERENCES Usuario(id) ON DELETE CASCADE
 );
 
--- Tabela de custos/despesas (ligada ao usuário)
+-- Tabela de custos/despesas
 CREATE TABLE IF NOT EXISTS Custo (
     id INT AUTO_INCREMENT PRIMARY KEY,
     tipo ENUM('Fixa','Variavel') NOT NULL,
     descricao VARCHAR(255) NOT NULL,
     valor DECIMAL(10,2) NOT NULL,
     usuario_id INT NOT NULL,
-    FOREIGN KEY (usuario_id) REFERENCES Usuario(id) ON DELETE CASCADE
+    produto_id INT DEFAULT NULL,
+    FOREIGN KEY (usuario_id) REFERENCES Usuario(id) ON DELETE CASCADE,
+    FOREIGN KEY (produto_id) REFERENCES Produto(id) ON DELETE CASCADE
 );

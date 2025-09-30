@@ -1,12 +1,13 @@
 <?php
-require_once "conexao.php";
+session_start();
 
-// Destrói todas as sessões
-session_unset();
+// Limpa todas as variáveis de sessão
+$_SESSION = [];
+
+// Destrói a sessão
 session_destroy();
 
 // Redireciona para a página de login
 header("Location: login.php");
 exit;
 ?>
-

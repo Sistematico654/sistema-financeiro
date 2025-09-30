@@ -1,7 +1,7 @@
 <?php
+
 require_once "conexao.php";
 
-// Se já estiver logado, redireciona para o dashboard
 if (isset($_SESSION['usuario_id'])) {
     header("Location: dashboard.php");
     exit;
@@ -10,35 +10,29 @@ if (isset($_SESSION['usuario_id'])) {
 $erro = "";
 $sucesso = "";
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+if ($_SERVER['REQUEST_METHOD'] == "POST") {
     $nome = trim($_POST['nome']);
     $email = trim($_POST['email']);
-    $senha = $_POST['senha'];
-    $senha_confirm = $_POST['senha_confirm'];
+    $senha = trim($_POST['senha']);
+    $confirmar_senha = trim($_POST['confirmar_senha']);
 
-    // Validação básica
-    if (empty($nome) || empty($email) || empty($senha) || empty($senha_confirm)) {
-        $erro = "Todos os campos são obrigatórios!";
-    } elseif ($senha !== $senha_confirm) {
-        $erro = "As senhas não coincidem!";
+    if (!$nome || !$email || !$senha || !$confirmar_senha) {
+        $erro = "Preencha todos os campos.";
+    } elseif ($senha !== $confirmar_senha) {
+        $erro = "As senhas não coincidem.";
     } else {
         // Verificar se email já existe
-        $stmt = $conn->prepare("SELECT id FROM Usuario WHERE email = :email");
-        $stmt->bindParam(':email', $email);
-        $stmt->execute();
-
+        $stmt = $conn->prepare("SELECT id FROM Usuario WHERE email = ?");
+        $stmt->execute([$email]);
         if ($stmt->fetch()) {
-            $erro = "Este email já está cadastrado!";
+            $erro = "Email já cadastrado.";
         } else {
-            // Criar usuário
+            // Inserir usuário
             $hashSenha = password_hash($senha, PASSWORD_DEFAULT);
-            $stmt = $conn->prepare("INSERT INTO Usuario (nome, email, senha) VALUES (:nome, :email, :senha)");
-            $stmt->bindParam(':nome', $nome);
-            $stmt->bindParam(':email', $email);
-            $stmt->bindParam(':senha', $hashSenha);
-            $stmt->execute();
+            $stmt = $conn->prepare("INSERT INTO Usuario (nome, email, senha) VALUES (?, ?, ?)");
+            $stmt->execute([$nome, $email, $hashSenha]);
 
-            $sucesso = "Cadastro realizado com sucesso! Você já pode fazer login.";
+            $sucesso = "Cadastro realizado com sucesso! Faça login para acessar o sistema.";
         }
     }
 }
@@ -50,38 +44,50 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <meta charset="UTF-8">
 <title>Cadastro - Sistema Financeiro</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-<style>
-body { background-color: #f7f9fc; }
-.card-cadastro { max-width: 450px; margin: 60px auto; padding: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 12px; background-color: #fff; }
-</style>
 </head>
-<body>
-<div class="card-cadastro">
-    <h3 class="text-center mb-4">Cadastro de Usuário</h3>
-    <?php 
-    if (!empty($erro)) echo "<div class='alert alert-danger'>$erro</div>"; 
-    if (!empty($sucesso)) echo "<div class='alert alert-success'>$sucesso</div>"; 
-    ?>
-    <form method="post">
-        <div class="mb-3">
-            <label>Nome:</label>
-            <input type="text" name="nome" class="form-control" required>
+<body class="bg-light">
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-5">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h3 class="card-title text-center mb-4">Cadastro</h3>
+
+                    <?php if($erro): ?>
+                        <div class="alert alert-danger"><?= htmlspecialchars($erro) ?></div>
+                    <?php endif; ?>
+
+                    <?php if($sucesso): ?>
+                        <div class="alert alert-success"><?= htmlspecialchars($sucesso) ?></div>
+                    <?php endif; ?>
+
+                    <form method="post">
+                        <div class="mb-3">
+                            <label>Nome</label>
+                            <input type="text" name="nome" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Email</label>
+                            <input type="email" name="email" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Senha</label>
+                            <input type="password" name="senha" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Confirmar Senha</label>
+                            <input type="password" name="confirmar_senha" class="form-control" required>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">Cadastrar</button>
+                    </form>
+
+                    <p class="mt-3 text-center">
+                        Já tem conta? <a href="login.php">Faça login</a>
+                    </p>
+                </div>
+            </div>
         </div>
-        <div class="mb-3">
-            <label>Email:</label>
-            <input type="email" name="email" class="form-control" required>
-        </div>
-        <div class="mb-3">
-            <label>Senha:</label>
-            <input type="password" name="senha" class="form-control" required>
-        </div>
-        <div class="mb-3">
-            <label>Confirmar Senha:</label>
-            <input type="password" name="senha_confirm" class="form-control" required>
-        </div>
-        <button type="submit" class="btn btn-success w-100">Cadastrar</button>
-    </form>
-    <p class="mt-3 text-center">Já tem conta? <a href="login.php">Faça login</a></p>
+    </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>

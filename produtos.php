@@ -1,55 +1,72 @@
 <?php
 require_once "conexao.php";
 protegerPagina();
+
 $usuario_id = $_SESSION['usuario_id'];
 
 // Inserir ou atualizar produto
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = $_POST['id'] ?? null;
-    $nome = $_POST['nome'];
-    $categoria = $_POST['categoria'] ?? null;
-    $preco_custo = $_POST['preco_custo'];
-    $preco_venda = $_POST['preco_venda'];
-    $quantidade = $_POST['quantidade'];
+    $nome = trim($_POST['nome']);
+    $categoria = trim($_POST['categoria']) ?: null;
+    $preco_custo = floatval($_POST['preco_custo']);
+    $preco_venda = floatval($_POST['preco_venda']);
+    $quantidade = intval($_POST['quantidade']);
 
     if ($id) {
-        // Atualizar
-        $stmt = $conn->prepare("UPDATE Produto SET nome=:nome, categoria=:categoria, preco_custo=:preco_custo, preco_venda=:preco_venda, quantidade=:quantidade WHERE id=:id AND usuario_id=:usuario_id");
-        $stmt->bindParam(':id', $id);
+        // Atualizar produto existente
+        $stmt = $conn->prepare("
+            UPDATE Produto 
+            SET nome = :nome, categoria = :categoria, preco_custo = :preco_custo, preco_venda = :preco_venda, quantidade = :quantidade 
+            WHERE id = :id AND usuario_id = :usuario_id
+        ");
+        $stmt->bindParam(':id', $id, PDO::PARAM_INT);
     } else {
-        // Inserir
-        $stmt = $conn->prepare("INSERT INTO Produto (nome, categoria, preco_custo, preco_venda, quantidade, usuario_id) VALUES (:nome, :categoria, :preco_custo, :preco_venda, :quantidade, :usuario_id)");
+        // Inserir novo produto
+        $stmt = $conn->prepare("
+            INSERT INTO Produto (nome, categoria, preco_custo, preco_venda, quantidade, usuario_id) 
+            VALUES (:nome, :categoria, :preco_custo, :preco_venda, :quantidade, :usuario_id)
+        ");
     }
+
     $stmt->bindParam(':nome', $nome);
     $stmt->bindParam(':categoria', $categoria);
     $stmt->bindParam(':preco_custo', $preco_custo);
     $stmt->bindParam(':preco_venda', $preco_venda);
-    $stmt->bindParam(':quantidade', $quantidade);
-    $stmt->bindParam(':usuario_id', $usuario_id);
+    $stmt->bindParam(':quantidade', $quantidade, PDO::PARAM_INT);
+    $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
     $stmt->execute();
+
     header("Location: produtos.php");
+    exit;
 }
 
 // Deletar produto
 if (isset($_GET['delete'])) {
-    $id = $_GET['delete'];
-    $stmt = $conn->prepare("DELETE FROM Produto WHERE id = ? AND usuario_id = ?");
-    $stmt->execute([$id, $usuario_id]);
+    $id = intval($_GET['delete']);
+    $stmt = $conn->prepare("DELETE FROM Produto WHERE id = :id AND usuario_id = :usuario_id");
+    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
+    $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
+    $stmt->execute();
     header("Location: produtos.php");
+    exit;
 }
 
 // Buscar produto para edição
 $editarProduto = null;
 if (isset($_GET['edit'])) {
-    $id = $_GET['edit'];
-    $stmt = $conn->prepare("SELECT * FROM Produto WHERE id = ? AND usuario_id = ?");
-    $stmt->execute([$id, $usuario_id]);
+    $id = intval($_GET['edit']);
+    $stmt = $conn->prepare("SELECT * FROM Produto WHERE id = :id AND usuario_id = :usuario_id");
+    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
+    $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
+    $stmt->execute();
     $editarProduto = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
-// Listar produtos do usuário
-$stmt = $conn->prepare("SELECT * FROM Produto WHERE usuario_id = ?");
-$stmt->execute([$usuario_id]);
+// Listar todos os produtos do usuário
+$stmt = $conn->prepare("SELECT * FROM Produto WHERE usuario_id = :usuario_id ORDER BY id DESC");
+$stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
+$stmt->execute();
 $produtos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
@@ -63,22 +80,23 @@ $produtos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <body class="bg-light">
 <div class="container mt-4">
     <h2>Produtos</h2>
+
     <form method="post" class="row g-3 mb-4">
-        <input type="hidden" name="id" value="<?= $editarProduto['id'] ?? '' ?>">
+        <input type="hidden" name="id" value="<?= htmlspecialchars($editarProduto['id'] ?? '') ?>">
         <div class="col-md-3">
-            <input type="text" name="nome" placeholder="Nome" class="form-control" value="<?= $editarProduto['nome'] ?? '' ?>" required>
+            <input type="text" name="nome" placeholder="Nome" class="form-control" value="<?= htmlspecialchars($editarProduto['nome'] ?? '') ?>" required>
         </div>
         <div class="col-md-2">
-            <input type="text" name="categoria" placeholder="Categoria" class="form-control" value="<?= $editarProduto['categoria'] ?? '' ?>">
+            <input type="text" name="categoria" placeholder="Categoria" class="form-control" value="<?= htmlspecialchars($editarProduto['categoria'] ?? '') ?>">
         </div>
         <div class="col-md-2">
-            <input type="number" step="0.01" name="preco_custo" placeholder="Preço Custo" class="form-control" value="<?= $editarProduto['preco_custo'] ?? '' ?>" required>
+            <input type="number" step="0.01" name="preco_custo" placeholder="Preço Custo" class="form-control" value="<?= htmlspecialchars($editarProduto['preco_custo'] ?? '') ?>" required>
         </div>
         <div class="col-md-2">
-            <input type="number" step="0.01" name="preco_venda" placeholder="Preço Venda" class="form-control" value="<?= $editarProduto['preco_venda'] ?? '' ?>" required>
+            <input type="number" step="0.01" name="preco_venda" placeholder="Preço Venda" class="form-control" value="<?= htmlspecialchars($editarProduto['preco_venda'] ?? '') ?>" required>
         </div>
         <div class="col-md-1">
-            <input type="number" name="quantidade" placeholder="Qtd" class="form-control" value="<?= $editarProduto['quantidade'] ?? '' ?>" required>
+            <input type="number" name="quantidade" placeholder="Qtd" class="form-control" value="<?= htmlspecialchars($editarProduto['quantidade'] ?? '') ?>" required>
         </div>
         <div class="col-md-2">
             <button type="submit" class="btn btn-success w-100"><?= $editarProduto ? 'Atualizar' : 'Adicionar' ?></button>
@@ -95,8 +113,8 @@ $produtos = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <?php foreach($produtos as $p): ?>
             <tr>
                 <td><?= $p['id'] ?></td>
-                <td><?= $p['nome'] ?></td>
-                <td><?= $p['categoria'] ?></td>
+                <td><?= htmlspecialchars($p['nome']) ?></td>
+                <td><?= htmlspecialchars($p['categoria']) ?></td>
                 <td>R$ <?= number_format($p['preco_custo'],2,",",".") ?></td>
                 <td>R$ <?= number_format($p['preco_venda'],2,",",".") ?></td>
                 <td><?= $p['quantidade'] ?></td>
@@ -111,6 +129,7 @@ $produtos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     <a href="dashboard.php" class="btn btn-primary mt-3">Voltar ao Painel</a>
 </div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
