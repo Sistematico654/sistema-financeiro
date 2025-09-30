@@ -4,16 +4,16 @@ protegerPagina();
 
 $usuario_id = $_SESSION['usuario_id'];
 
-// Buscar produtos e custos do usuário
-$produtosStmt = $conn->prepare("SELECT * FROM Produto WHERE usuario_id = ?");
+// Buscar produtos e custos
+$produtosStmt = $conn->prepare("SELECT * FROM Produto WHERE usuario_id = ? ORDER BY nome ASC");
 $produtosStmt->execute([$usuario_id]);
 $produtos = $produtosStmt->fetchAll(PDO::FETCH_ASSOC);
 
-$despesasStmt = $conn->prepare("SELECT * FROM Custo WHERE usuario_id = ?");
+$despesasStmt = $conn->prepare("SELECT * FROM Custo WHERE usuario_id = ? ORDER BY descricao ASC");
 $despesasStmt->execute([$usuario_id]);
 $despesas = $despesasStmt->fetchAll(PDO::FETCH_ASSOC);
 
-$resultados = [];
+$dadosEquilibrio = [];
 
 foreach ($produtos as $p) {
     $id = $p['id'];
@@ -22,39 +22,29 @@ foreach ($produtos as $p) {
     $preco_custo = $p['preco_custo'];
     $preco_venda = $p['preco_venda'];
 
-    $custoVariavel = $preco_custo * $quantidade;
+    // Custo Fixo
     $custoFixo = 0;
-
     foreach ($despesas as $d) {
-        if ($d['produto_id'] == $id) {
-            if ($d['tipo'] == 'Fixa') {
-                $custoFixo += $d['valor'];
-            } else {
-                $custoVariavel += $d['valor'];
-            }
-        }
-
-        if (is_null($d['produto_id'])) {
-            if ($d['tipo'] == 'Fixa') {
-                $custoFixo += $d['valor'] / count($produtos);
-            } else {
-                $custoVariavel += $d['valor'] / count($produtos);
-            }
+        if ($d['produto_id'] == $id || is_null($d['produto_id'])) {
+            $custoFixo += $d['valor'] / (is_null($d['produto_id']) ? count($produtos) : 1);
         }
     }
 
-    $receitaTotal = $preco_venda * $quantidade;
-    $custoVariavelUnitario = $custoVariavel / $quantidade;
-    $pontoEquilibrio = ($preco_venda - $custoVariavelUnitario) > 0
-        ? ceil($custoFixo / ($preco_venda - $custoVariavelUnitario))
-        : 0;
+    // Custo Variável
+    $custoVariavel = $preco_custo * $quantidade;
 
-    $resultados[] = [
+    // Receita Total
+    $receitaTotal = $preco_venda * $quantidade;
+
+    // Ponto de Equilíbrio
+    $pontoEquilibrio = ($preco_venda - $preco_custo) > 0 ? ceil($custoFixo / ($preco_venda - $preco_custo)) : 0;
+
+    $dadosEquilibrio[] = [
         'produto' => $nome,
-        'receita' => $receitaTotal,
         'custoFixo' => $custoFixo,
         'custoVariavel' => $custoVariavel,
-        'ponto' => $pontoEquilibrio
+        'receitaTotal' => $receitaTotal,
+        'pontoEquilibrio' => $pontoEquilibrio
     ];
 }
 ?>
@@ -65,34 +55,62 @@ foreach ($produtos as $p) {
 <meta charset="UTF-8">
 <title>Ponto de Equilíbrio - Sistema Financeiro</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-light">
 <div class="container mt-4">
     <h2>Ponto de Equilíbrio por Produto</h2>
-    <table class="table table-bordered bg-white">
+
+    <canvas id="grafico" height="100"></canvas>
+
+    <table class="table table-bordered bg-white mt-4">
         <thead class="table-light">
             <tr>
                 <th>Produto</th>
-                <th>Receita Total</th>
                 <th>Custo Fixo</th>
                 <th>Custo Variável</th>
+                <th>Receita Total</th>
                 <th>Ponto de Equilíbrio (unidades)</th>
             </tr>
         </thead>
         <tbody>
-            <?php foreach($resultados as $r): ?>
+            <?php foreach($dadosEquilibrio as $d): ?>
             <tr>
-                <td><?= htmlspecialchars($r['produto']) ?></td>
-                <td>R$ <?= number_format($r['receita'],2,",",".") ?></td>
-                <td>R$ <?= number_format($r['custoFixo'],2,",",".") ?></td>
-                <td>R$ <?= number_format($r['custoVariavel'],2,",",".") ?></td>
-                <td><?= $r['ponto'] ?></td>
+                <td><?= htmlspecialchars($d['produto']) ?></td>
+                <td>R$ <?= number_format($d['custoFixo'],2,",",".") ?></td>
+                <td>R$ <?= number_format($d['custoVariavel'],2,",",".") ?></td>
+                <td>R$ <?= number_format($d['receitaTotal'],2,",",".") ?></td>
+                <td><?= $d['pontoEquilibrio'] ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>
     </table>
+
     <a href="dashboard.php" class="btn btn-primary mt-3">Voltar ao Painel</a>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+const ctx = document.getElementById('grafico').getContext('2d');
+const labels = <?= json_encode(array_column($dadosEquilibrio, 'produto')) ?>;
+const receitaData = <?= json_encode(array_column($dadosEquilibrio, 'receitaTotal')) ?>;
+const custoFixoData = <?= json_encode(array_column($dadosEquilibrio, 'custoFixo')) ?>;
+const custoVariavelData = <?= json_encode(array_column($dadosEquilibrio, 'custoVariavel')) ?>;
+
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: labels,
+        datasets: [
+            { label: 'Custo Fixo', data: custoFixoData, backgroundColor: 'rgba(255, 99, 132, 0.7)' },
+            { label: 'Custo Variável', data: custoVariavelData, backgroundColor: 'rgba(54, 162, 235, 0.7)' },
+            { label: 'Receita Total', data: receitaData, backgroundColor: 'rgba(75, 192, 192, 0.7)' }
+        ]
+    },
+    options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } }
+    }
+});
+</script>
 </body>
 </html>

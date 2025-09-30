@@ -5,11 +5,11 @@ protegerPagina();
 $usuario_id = $_SESSION['usuario_id'];
 
 // Buscar produtos e custos
-$produtosStmt = $conn->prepare("SELECT * FROM Produto WHERE usuario_id = ?");
+$produtosStmt = $conn->prepare("SELECT * FROM Produto WHERE usuario_id = ? ORDER BY nome ASC");
 $produtosStmt->execute([$usuario_id]);
 $produtos = $produtosStmt->fetchAll(PDO::FETCH_ASSOC);
 
-$despesasStmt = $conn->prepare("SELECT * FROM Custo WHERE usuario_id = ?");
+$despesasStmt = $conn->prepare("SELECT * FROM Custo WHERE usuario_id = ? ORDER BY descricao ASC");
 $despesasStmt->execute([$usuario_id]);
 $despesas = $despesasStmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -22,34 +22,27 @@ foreach ($produtos as $p) {
     $preco_custo = $p['preco_custo'];
     $preco_venda = $p['preco_venda'];
 
-    $custoVariavel = $preco_custo * $quantidade;
     $custoFixo = 0;
-
     foreach ($despesas as $d) {
-        if ($d['produto_id'] == $id) {
-            if ($d['tipo'] == 'Fixa') {
-                $custoFixo += $d['valor'];
-            } else {
-                $custoVariavel += $d['valor'];
-            }
-        }
-
-        if (is_null($d['produto_id'])) {
-            if ($d['tipo'] == 'Fixa') {
-                $custoFixo += $d['valor'] / count($produtos);
-            } else {
-                $custoVariavel += $d['valor'] / count($produtos);
-            }
+        if ($d['produto_id'] == $id || is_null($d['produto_id'])) {
+            $custoFixo += $d['valor'] / (is_null($d['produto_id']) ? count($produtos) : 1);
         }
     }
 
     $receitaTotal = $preco_venda * $quantidade;
-    $custoTotal = $custoFixo + $custoVariavel;
+    $custoTotal = $custoFixo + ($preco_custo * $quantidade);
+    $pontoEquilibrio = ($preco_venda - $preco_custo) > 0
+        ? ceil($custoFixo / ($preco_venda - $preco_custo))
+        : 0;
+
+    $viabilidade = ($receitaTotal - $custoTotal) > 0 ? "Lucro" : "Prejuízo";
 
     $dadosGrafico[] = [
         'produto' => $nome,
-        'receita' => $receitaTotal,
-        'custoTotal' => $custoTotal
+        'receitaTotal' => $receitaTotal,
+        'custoTotal' => $custoTotal,
+        'pontoEquilibrio' => $pontoEquilibrio,
+        'viabilidade' => $viabilidade
     ];
 }
 ?>
@@ -66,37 +59,45 @@ foreach ($produtos as $p) {
 <div class="container mt-4">
     <h2>Relatório de Viabilidade por Produto</h2>
 
+    <!-- Gráfico -->
     <canvas id="grafico" height="100"></canvas>
 
+    <!-- Tabela -->
     <table class="table table-bordered bg-white mt-4">
         <thead class="table-light">
             <tr>
                 <th>Produto</th>
                 <th>Receita Total</th>
                 <th>Custo Total</th>
+                <th>Ponto de Equilíbrio (unidades)</th>
+                <th>Viabilidade</th>
             </tr>
         </thead>
         <tbody>
             <?php foreach($dadosGrafico as $d): ?>
             <tr>
                 <td><?= htmlspecialchars($d['produto']) ?></td>
-                <td>R$ <?= number_format($d['receita'],2,",",".") ?></td>
+                <td>R$ <?= number_format($d['receitaTotal'],2,",",".") ?></td>
                 <td>R$ <?= number_format($d['custoTotal'],2,",",".") ?></td>
+                <td><?= $d['pontoEquilibrio'] ?></td>
+                <td><?= $d['viabilidade'] ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>
     </table>
 
-    <a href="dashboard.php" class="btn btn-primary mt-3">Voltar ao Painel</a>
+    <div class="mt-3">
+        <a href="dashboard.php" class="btn btn-primary">Voltar ao Painel</a>
+    </div>
 </div>
 
 <script>
 const ctx = document.getElementById('grafico').getContext('2d');
 const labels = <?= json_encode(array_column($dadosGrafico, 'produto')) ?>;
-const receitaData = <?= json_encode(array_column($dadosGrafico, 'receita')) ?>;
-const custoTotalData = <?= json_encode(array_column($dadosGrafico, 'custoTotal')) ?>;
+const receitaData = <?= json_encode(array_column($dadosGrafico, 'receitaTotal')) ?>;
+const custoData = <?= json_encode(array_column($dadosGrafico, 'custoTotal')) ?>;
 
-const grafico = new Chart(ctx, {
+new Chart(ctx, {
     type: 'bar',
     data: {
         labels: labels,
@@ -108,7 +109,7 @@ const grafico = new Chart(ctx, {
             },
             {
                 label: 'Custo Total',
-                data: custoTotalData,
+                data: custoData,
                 backgroundColor: 'rgba(255, 99, 132, 0.7)'
             }
         ]

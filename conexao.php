@@ -1,11 +1,14 @@
 <?php
-session_start();
+// Inicia a sessão apenas se ainda não estiver iniciada
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Configurações do banco de dados
-$host = "localhost";
-$db   = "sistema_financeiro";
-$user = "root";        // ajuste se seu usuário for diferente
-$pass = "";            // ajuste se sua senha for diferente
+$host    = "localhost";
+$db      = "sistema_financeiro";
+$user    = "root";  // ajuste se seu usuário for diferente
+$pass    = "";      // ajuste se sua senha for diferente
 $charset = "utf8mb4";
 
 // DSN e opções PDO
@@ -22,7 +25,7 @@ try {
     die("Erro ao conectar ao banco de dados: " . $e->getMessage());
 }
 
-// Função para proteger páginas (verifica login)
+// Função para proteger páginas que exigem login
 function protegerPagina() {
     if (!isset($_SESSION['usuario_id'])) {
         header("Location: login.php");
