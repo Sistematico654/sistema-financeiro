@@ -34,35 +34,5 @@ CREATE TABLE IF NOT EXISTS Custo (
     descricao VARCHAR(100) NOT NULL,
     valor DECIMAL(10,2) NOT NULL,
     FOREIGN KEY (usuario_id) REFERENCES Usuario(id) ON DELETE CASCADE,
-    FOREIGN KEY (produto_id) REFERENCES Produto(id) ON DELETE CASCADE
-);
-
--- Tabela de ponto de equilíbrio
-CREATE TABLE IF NOT EXISTS PontoEquilibrio (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    usuario_id INT NOT NULL,
-    produto_id INT NOT NULL,
-    receitasTotais DECIMAL(10,2) NOT NULL,
-    custosTotais DECIMAL(10,2) NOT NULL,
-    ponto DECIMAL(10,2) NOT NULL,
-    FOREIGN KEY (usuario_id) REFERENCES Usuario(id) ON DELETE CASCADE,
-    FOREIGN KEY (produto_id) REFERENCES Produto(id) ON DELETE CASCADE
-);
-
--- Tabela de relatórios
-CREATE TABLE IF NOT EXISTS Relatorio (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    usuario_id INT NOT NULL,
-    dataCriacao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    conteudo TEXT NOT NULL,
-    FOREIGN KEY (usuario_id) REFERENCES Usuario(id) ON DELETE CASCADE
-);
-
--- Tabela de histórico de alterações
-CREATE TABLE IF NOT EXISTS HistoricoAlteracao (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    usuario_id INT NOT NULL,
-    dataAlteracao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    alteracao TEXT NOT NULL,
-    FOREIGN KEY (usuario_id) REFERENCES Usuario(id) ON DELETE CASCADE
+    FOREIGN KEY (produto_id) REFERENCES Produto(id) ON DELETE SET NULL
 );
