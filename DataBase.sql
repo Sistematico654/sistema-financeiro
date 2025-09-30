@@ -34,5 +34,5 @@ CREATE TABLE IF NOT EXISTS Custo (
     descricao VARCHAR(100) NOT NULL,
     valor DECIMAL(10,2) NOT NULL,
     FOREIGN KEY (usuario_id) REFERENCES Usuario(id) ON DELETE CASCADE,
-    FOREIGN KEY (produto_id) REFERENCES Produto(id) ON DELETE SET NULL
+    FOREIGN KEY (produto_id) REFERENCES Produto(id) ON DELETE CASCADE
 );
