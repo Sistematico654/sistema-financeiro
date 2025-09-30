@@ -4,25 +4,50 @@ protegerPagina();
 
 $usuario_id = $_SESSION['usuario_id'];
 
-// Buscar produtos do usuário em ordem alfabética
-$produtosStmt = $conn->prepare("SELECT * FROM Produto WHERE usuario_id = ? ORDER BY nome ASC");
-$produtosStmt->execute([$usuario_id]);
-$produtos = $produtosStmt->fetchAll(PDO::FETCH_ASSOC);
+// Buscar produtos do usuário
+$stmt = $conn->prepare("SELECT * FROM Produto WHERE usuario_id = ? ORDER BY nome ASC");
+$stmt->execute([$usuario_id]);
+$produtos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Preparar dados para gráfico
-$nomes = [];
-$precoCustoData = [];
-$precoVendaData = [];
-foreach ($produtos as $p) {
-    $nomes[] = $p['nome'];
-    $precoCustoData[] = $p['preco_custo'] * $p['quantidade'];
-    $precoVendaData[] = $p['preco_venda'] * $p['quantidade'];
+// Inserir ou atualizar produto
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $id = isset($_POST['id']) && $_POST['id'] !== '' ? intval($_POST['id']) : null;
+    $nome = trim($_POST['nome'] ?? '');
+    $categoria = trim($_POST['categoria'] ?? '');
+    $preco_custo = floatval($_POST['preco_custo'] ?? 0);
+    $preco_venda = floatval($_POST['preco_venda'] ?? 0);
+    $qtd = intval($_POST['qtd'] ?? 0);
+
+    if ($id) {
+        $stmt = $conn->prepare("
+            UPDATE Produto 
+            SET nome=:nome, categoria=:categoria, preco_custo=:preco_custo, preco_venda=:preco_venda, qtd=:qtd
+            WHERE id=:id AND usuario_id=:usuario_id
+        ");
+        $stmt->bindParam(':id', $id, PDO::PARAM_INT);
+    } else {
+        $stmt = $conn->prepare("
+            INSERT INTO Produto (nome, categoria, preco_custo, preco_venda, qtd, usuario_id)
+            VALUES (:nome, :categoria, :preco_custo, :preco_venda, :qtd, :usuario_id)
+        ");
+    }
+
+    $stmt->bindParam(':nome', $nome);
+    $stmt->bindParam(':categoria', $categoria);
+    $stmt->bindParam(':preco_custo', $preco_custo);
+    $stmt->bindParam(':preco_venda', $preco_venda);
+    $stmt->bindParam(':qtd', $qtd);
+    $stmt->bindParam(':usuario_id', $usuario_id);
+    $stmt->execute();
+
+    header("Location: produtos.php");
+    exit;
 }
 
 // Deletar produto
 if (isset($_GET['delete'])) {
     $id = intval($_GET['delete']);
-    $stmt = $conn->prepare("DELETE FROM Produto WHERE id = :id AND usuario_id = :usuario_id");
+    $stmt = $conn->prepare("DELETE FROM Produto WHERE id=:id AND usuario_id=:usuario_id");
     $stmt->bindParam(':id', $id, PDO::PARAM_INT);
     $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
     $stmt->execute();
@@ -34,39 +59,22 @@ if (isset($_GET['delete'])) {
 $editarProduto = null;
 if (isset($_GET['edit'])) {
     $id = intval($_GET['edit']);
-    $stmt = $conn->prepare("SELECT * FROM Produto WHERE id = :id AND usuario_id = :usuario_id");
+    $stmt = $conn->prepare("SELECT * FROM Produto WHERE id=:id AND usuario_id=:usuario_id");
     $stmt->bindParam(':id', $id, PDO::PARAM_INT);
     $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
     $stmt->execute();
     $editarProduto = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
-// Inserir ou atualizar produto
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $id = $_POST['id'] ?? null;
-    $nome = trim($_POST['nome']);
-    $categoria = trim($_POST['categoria']);
-    $preco_custo = floatval($_POST['preco_custo']);
-    $preco_venda = floatval($_POST['preco_venda']);
-    $quantidade = intval($_POST['quantidade']);
+// Preparar dados para gráfico
+$labels = [];
+$precoCustoData = [];
+$precoVendaData = [];
 
-    if ($id) {
-        $stmt = $conn->prepare("UPDATE Produto SET nome=:nome, categoria=:categoria, preco_custo=:preco_custo, preco_venda=:preco_venda, quantidade=:quantidade WHERE id=:id AND usuario_id=:usuario_id");
-        $stmt->bindParam(':id', $id);
-    } else {
-        $stmt = $conn->prepare("INSERT INTO Produto (nome, categoria, preco_custo, preco_venda, quantidade, usuario_id) VALUES (:nome, :categoria, :preco_custo, :preco_venda, :quantidade, :usuario_id)");
-    }
-
-    $stmt->bindParam(':nome', $nome);
-    $stmt->bindParam(':categoria', $categoria);
-    $stmt->bindParam(':preco_custo', $preco_custo);
-    $stmt->bindParam(':preco_venda', $preco_venda);
-    $stmt->bindParam(':quantidade', $quantidade);
-    $stmt->bindParam(':usuario_id', $usuario_id);
-    $stmt->execute();
-
-    header("Location: produtos.php");
-    exit;
+foreach ($produtos as $p) {
+    $labels[] = $p['nome'];
+    $precoCustoData[] = floatval($p['preco_custo']) * intval($p['qtd']);
+    $precoVendaData[] = floatval($p['preco_venda']) * intval($p['qtd']);
 }
 ?>
 
@@ -85,8 +93,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <form method="post" class="row g-3 mb-4">
         <input type="hidden" name="id" value="<?= $editarProduto['id'] ?? '' ?>">
 
-        <div class="col-md-3">
-            <input type="text" name="nome" placeholder="Nome do produto" class="form-control" value="<?= htmlspecialchars($editarProduto['nome'] ?? '') ?>" required>
+        <div class="col-md-2">
+            <input type="text" name="nome" placeholder="Nome" class="form-control" value="<?= htmlspecialchars($editarProduto['nome'] ?? '') ?>" required>
         </div>
 
         <div class="col-md-2">
@@ -101,8 +109,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <input type="number" step="0.01" name="preco_venda" placeholder="Preço Venda" class="form-control" value="<?= htmlspecialchars($editarProduto['preco_venda'] ?? '') ?>" required>
         </div>
 
-        <div class="col-md-1">
-            <input type="number" name="quantidade" placeholder="Qtd" class="form-control" value="<?= htmlspecialchars($editarProduto['quantidade'] ?? '') ?>" required>
+        <div class="col-md-2">
+            <input type="number" name="qtd" placeholder="Quantidade" class="form-control" value="<?= htmlspecialchars($editarProduto['qtd'] ?? '') ?>" required>
         </div>
 
         <div class="col-md-2">
@@ -110,7 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </form>
 
-    <!-- Gráfico de comparação -->
+    <!-- Gráfico de comparação Custo x Venda -->
     <div class="bg-white p-3 mb-4 border rounded">
         <canvas id="graficoProdutos" height="100"></canvas>
     </div>
@@ -123,19 +131,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <th>Categoria</th>
                 <th>Preço Custo</th>
                 <th>Preço Venda</th>
-                <th>Qtd</th>
+                <th>Quantidade</th>
                 <th>Ações</th>
             </tr>
         </thead>
         <tbody>
-            <?php foreach($produtos as $p): ?>
+            <?php foreach ($produtos as $p): ?>
             <tr>
                 <td><?= $p['id'] ?></td>
                 <td><?= htmlspecialchars($p['nome']) ?></td>
                 <td><?= htmlspecialchars($p['categoria']) ?></td>
-                <td>R$ <?= number_format($p['preco_custo'],2,",",".") ?></td>
-                <td>R$ <?= number_format($p['preco_venda'],2,",",".") ?></td>
-                <td><?= $p['quantidade'] ?></td>
+                <td>R$ <?= number_format(floatval($p['preco_custo']), 2, ",", ".") ?></td>
+                <td>R$ <?= number_format(floatval($p['preco_venda']), 2, ",", ".") ?></td>
+                <td><?= intval($p['qtd']) ?></td>
                 <td>
                     <a href="?edit=<?= $p['id'] ?>" class="btn btn-primary btn-sm">Editar</a>
                     <a href="?delete=<?= $p['id'] ?>" class="btn btn-danger btn-sm" onclick="return confirm('Deseja realmente deletar?')">Deletar</a>
@@ -150,18 +158,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <script>
 const ctx = document.getElementById('graficoProdutos').getContext('2d');
-const graficoProdutos = new Chart(ctx, {
+new Chart(ctx, {
     type: 'bar',
     data: {
-        labels: <?= json_encode($nomes) ?>,
+        labels: <?= json_encode($labels) ?>,
         datasets: [
             {
-                label: 'Preço Custo x Quantidade',
+                label: 'Custo Total',
                 data: <?= json_encode($precoCustoData) ?>,
                 backgroundColor: 'rgba(255, 99, 132, 0.7)'
             },
             {
-                label: 'Preço Venda x Quantidade',
+                label: 'Venda Total',
                 data: <?= json_encode($precoVendaData) ?>,
                 backgroundColor: 'rgba(54, 162, 235, 0.7)'
             }

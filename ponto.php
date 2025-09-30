@@ -4,47 +4,47 @@ protegerPagina();
 
 $usuario_id = $_SESSION['usuario_id'];
 
-// Buscar produtos e custos
+// Buscar produtos do usuário
 $produtosStmt = $conn->prepare("SELECT * FROM Produto WHERE usuario_id = ? ORDER BY nome ASC");
 $produtosStmt->execute([$usuario_id]);
 $produtos = $produtosStmt->fetchAll(PDO::FETCH_ASSOC);
 
-$despesasStmt = $conn->prepare("SELECT * FROM Custo WHERE usuario_id = ? ORDER BY descricao ASC");
-$despesasStmt->execute([$usuario_id]);
-$despesas = $despesasStmt->fetchAll(PDO::FETCH_ASSOC);
-
-$dadosEquilibrio = [];
+$resultados = [];
 
 foreach ($produtos as $p) {
-    $id = $p['id'];
-    $nome = $p['nome'];
-    $quantidade = $p['quantidade'];
-    $preco_custo = $p['preco_custo'];
-    $preco_venda = $p['preco_venda'];
+    $produto_id = $p['id'];
+    $preco_custo = floatval($p['preco_custo']);
+    $preco_venda = floatval($p['preco_venda']);
+    $quantidade = intval($p['qtd']);
 
-    // Custo Fixo
-    $custoFixo = 0;
-    foreach ($despesas as $d) {
-        if ($d['produto_id'] == $id || is_null($d['produto_id'])) {
-            $custoFixo += $d['valor'] / (is_null($d['produto_id']) ? count($produtos) : 1);
-        }
-    }
+    // Custos fixos
+    $stmtFixo = $conn->prepare("SELECT SUM(valor) AS total_fixo FROM Custo WHERE usuario_id = ? AND produto_id = ? AND tipo = 'Fixa'");
+    $stmtFixo->execute([$usuario_id, $produto_id]);
+    $custo_fixo = floatval($stmtFixo->fetchColumn());
 
-    // Custo Variável
-    $custoVariavel = $preco_custo * $quantidade;
+    // Custos variáveis cadastrados
+    $stmtVar = $conn->prepare("SELECT SUM(valor) AS total_var FROM Custo WHERE usuario_id = ? AND produto_id = ? AND tipo = 'Variavel'");
+    $stmtVar->execute([$usuario_id, $produto_id]);
+    $custo_variavel = floatval($stmtVar->fetchColumn());
 
-    // Receita Total
-    $receitaTotal = $preco_venda * $quantidade;
+    // Incluir o custo do produto como custo variável
+    $totalCustoVariavel = $custo_variavel + ($preco_custo * $quantidade);
 
-    // Ponto de Equilíbrio
-    $pontoEquilibrio = ($preco_venda - $preco_custo) > 0 ? ceil($custoFixo / ($preco_venda - $preco_custo)) : 0;
+    // Receita total
+    $receita_total = $preco_venda * $quantidade;
 
-    $dadosEquilibrio[] = [
-        'produto' => $nome,
-        'custoFixo' => $custoFixo,
-        'custoVariavel' => $custoVariavel,
-        'receitaTotal' => $receitaTotal,
-        'pontoEquilibrio' => $pontoEquilibrio
+    // Margem por unidade considerando custo variável
+    $margem_unitaria = $preco_venda - ($preco_custo + ($custo_variavel / max($quantidade,1)));
+
+    // Ponto de equilíbrio (unidades)
+    $ponto_equilibrio = ($margem_unitaria > 0) ? ceil($custo_fixo / $margem_unitaria) : 0;
+
+    $resultados[] = [
+        'nome' => $p['nome'],
+        'custo_fixo' => $custo_fixo,
+        'custo_variavel' => $totalCustoVariavel,
+        'receita_total' => $receita_total,
+        'ponto_equilibrio' => $ponto_equilibrio
     ];
 }
 ?>
@@ -61,9 +61,12 @@ foreach ($produtos as $p) {
 <div class="container mt-4">
     <h2>Ponto de Equilíbrio por Produto</h2>
 
-    <canvas id="grafico" height="100"></canvas>
+    <!-- Gráfico -->
+    <div class="bg-white p-3 mb-4 border rounded">
+        <canvas id="graficoPonto" height="100"></canvas>
+    </div>
 
-    <table class="table table-bordered bg-white mt-4">
+    <table class="table table-bordered bg-white mt-3">
         <thead class="table-light">
             <tr>
                 <th>Produto</th>
@@ -74,43 +77,60 @@ foreach ($produtos as $p) {
             </tr>
         </thead>
         <tbody>
-            <?php foreach($dadosEquilibrio as $d): ?>
+            <?php foreach ($resultados as $r): ?>
             <tr>
-                <td><?= htmlspecialchars($d['produto']) ?></td>
-                <td>R$ <?= number_format($d['custoFixo'],2,",",".") ?></td>
-                <td>R$ <?= number_format($d['custoVariavel'],2,",",".") ?></td>
-                <td>R$ <?= number_format($d['receitaTotal'],2,",",".") ?></td>
-                <td><?= $d['pontoEquilibrio'] ?></td>
+                <td><?= htmlspecialchars($r['nome']) ?></td>
+                <td>R$ <?= number_format($r['custo_fixo'], 2, ",", ".") ?></td>
+                <td>R$ <?= number_format($r['custo_variavel'], 2, ",", ".") ?></td>
+                <td>R$ <?= number_format($r['receita_total'], 2, ",", ".") ?></td>
+                <td><?= $r['ponto_equilibrio'] ?></td>
             </tr>
             <?php endforeach; ?>
         </tbody>
     </table>
 
+    <!-- Botão para voltar ao painel -->
     <a href="dashboard.php" class="btn btn-primary mt-3">Voltar ao Painel</a>
 </div>
 
 <script>
-const ctx = document.getElementById('grafico').getContext('2d');
-const labels = <?= json_encode(array_column($dadosEquilibrio, 'produto')) ?>;
-const receitaData = <?= json_encode(array_column($dadosEquilibrio, 'receitaTotal')) ?>;
-const custoFixoData = <?= json_encode(array_column($dadosEquilibrio, 'custoFixo')) ?>;
-const custoVariavelData = <?= json_encode(array_column($dadosEquilibrio, 'custoVariavel')) ?>;
+const ctx = document.getElementById('graficoPonto').getContext('2d');
+
+const labels = <?= json_encode(array_column($resultados, 'nome')) ?>;
+const custoFixo = <?= json_encode(array_column($resultados, 'custo_fixo')) ?>;
+const custoVariavel = <?= json_encode(array_column($resultados, 'custo_variavel')) ?>;
+const receitaTotal = <?= json_encode(array_column($resultados, 'receita_total')) ?>;
 
 new Chart(ctx, {
     type: 'bar',
     data: {
         labels: labels,
         datasets: [
-            { label: 'Custo Fixo', data: custoFixoData, backgroundColor: 'rgba(255, 99, 132, 0.7)' },
-            { label: 'Custo Variável', data: custoVariavelData, backgroundColor: 'rgba(54, 162, 235, 0.7)' },
-            { label: 'Receita Total', data: receitaData, backgroundColor: 'rgba(75, 192, 192, 0.7)' }
+            {
+                label: 'Custo Fixo',
+                data: custoFixo,
+                backgroundColor: 'rgba(255, 99, 132, 0.7)'
+            },
+            {
+                label: 'Custo Variável',
+                data: custoVariavel,
+                backgroundColor: 'rgba(54, 162, 235, 0.7)'
+            },
+            {
+                label: 'Receita Total',
+                data: receitaTotal,
+                backgroundColor: 'rgba(75, 192, 192, 0.7)'
+            }
         ]
     },
     options: {
         responsive: true,
+        plugins: { legend: { position: 'top' } },
         scales: { y: { beginAtZero: true } }
     }
 });
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

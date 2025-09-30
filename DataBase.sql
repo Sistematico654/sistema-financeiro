@@ -1,15 +1,11 @@
--- =========================
--- Criar banco de dados
--- =========================
+-- Criar o banco de dados
 CREATE DATABASE IF NOT EXISTS sistema_financeiro
 CHARACTER SET utf8mb4
 COLLATE utf8mb4_general_ci;
 
 USE sistema_financeiro;
 
--- =========================
--- Tabela de Usuários
--- =========================
+-- Tabela de usuários
 CREATE TABLE IF NOT EXISTS Usuario (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
@@ -17,29 +13,26 @@ CREATE TABLE IF NOT EXISTS Usuario (
     senha VARCHAR(255) NOT NULL
 );
 
--- =========================
--- Tabela de Produtos
--- =========================
+-- Tabela de produtos
 CREATE TABLE IF NOT EXISTS Produto (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT NOT NULL,
     nome VARCHAR(100) NOT NULL,
-    categoria VARCHAR(100),
+    categoria VARCHAR(50) NOT NULL,
     preco_custo DECIMAL(10,2) NOT NULL,
     preco_venda DECIMAL(10,2) NOT NULL,
-    quantidade INT NOT NULL DEFAULT 0,
+    qtd INT NOT NULL,
     FOREIGN KEY (usuario_id) REFERENCES Usuario(id) ON DELETE CASCADE
 );
 
--- =========================
--- Tabela de Custos / Despesas
--- =========================
+-- Tabela de custos/despesas
 CREATE TABLE IF NOT EXISTS Custo (
     id INT AUTO_INCREMENT PRIMARY KEY,
     usuario_id INT NOT NULL,
-    descricao VARCHAR(255) NOT NULL,
+    produto_id INT NULL, -- NULL indica custo geral
+    tipo ENUM('Fixa','Variavel') NOT NULL DEFAULT 'Fixa',
+    descricao VARCHAR(100) NOT NULL,
     valor DECIMAL(10,2) NOT NULL,
-    produto_id INT DEFAULT NULL, -- nulo indica custo geral para todos os produtos
     FOREIGN KEY (usuario_id) REFERENCES Usuario(id) ON DELETE CASCADE,
     FOREIGN KEY (produto_id) REFERENCES Produto(id) ON DELETE SET NULL
 );
