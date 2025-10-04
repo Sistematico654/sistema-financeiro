@@ -1,80 +1,101 @@
 <?php
 require_once "conexao.php";
+require_once "funcoes.php";
 protegerPagina();
 
 $usuario_id = $_SESSION['usuario_id'];
 
-// Buscar produtos do usuário
-$stmt = $conn->prepare("SELECT * FROM Produto WHERE usuario_id = ? ORDER BY nome ASC");
-$stmt->execute([$usuario_id]);
-$produtos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Classe Produto
+class Produto {
+    private $conn;
+    private $usuario_id;
 
-// Inserir ou atualizar produto
+    public function __construct($conn, $usuario_id) {
+        $this->conn = $conn;
+        $this->usuario_id = $usuario_id;
+    }
+
+    public function listar() {
+        $stmt = $this->conn->prepare("SELECT * FROM Produto WHERE usuario_id=? ORDER BY nome ASC");
+        $stmt->execute([$this->usuario_id]);
+        return $stmt->fetchAll();
+    }
+
+    public function buscar($id) {
+        $stmt = $this->conn->prepare("SELECT * FROM Produto WHERE id=? AND usuario_id=?");
+        $stmt->execute([$id, $this->usuario_id]);
+        return $stmt->fetch();
+    }
+
+    public function salvar($id, $nome, $categoria, $preco_custo, $preco_venda, $qtd) {
+        if ($id) {
+            $stmt = $this->conn->prepare("
+                UPDATE Produto 
+                SET nome=?, categoria=?, preco_custo=?, preco_venda=?, qtd=? 
+                WHERE id=? AND usuario_id=?
+            ");
+            return $stmt->execute([$nome, $categoria, $preco_custo, $preco_venda, $qtd, $id, $this->usuario_id]);
+        } else {
+            $stmt = $this->conn->prepare("
+                INSERT INTO Produto (nome, categoria, preco_custo, preco_venda, qtd, usuario_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ");
+            return $stmt->execute([$nome, $categoria, $preco_custo, $preco_venda, $qtd, $this->usuario_id]);
+        }
+    }
+
+    public function deletar($id) {
+        $stmt = $this->conn->prepare("DELETE FROM Produto WHERE id=? AND usuario_id=?");
+        return $stmt->execute([$id, $this->usuario_id]);
+    }
+}
+
+// Conexão
+$conn = Database::getInstance()->getConnection();
+$produto = new Produto($conn, $usuario_id);
+
+$editarProduto = null;
+
+// Adicionar / Atualizar
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $id = isset($_POST['id']) && $_POST['id'] !== '' ? intval($_POST['id']) : null;
+    $id = $_POST['id'] ?? null;
+    $id = $id !== '' ? intval($id) : null;
     $nome = trim($_POST['nome'] ?? '');
     $categoria = trim($_POST['categoria'] ?? '');
     $preco_custo = floatval($_POST['preco_custo'] ?? 0);
     $preco_venda = floatval($_POST['preco_venda'] ?? 0);
     $qtd = intval($_POST['qtd'] ?? 0);
 
-    if ($id) {
-        $stmt = $conn->prepare("
-            UPDATE Produto 
-            SET nome=:nome, categoria=:categoria, preco_custo=:preco_custo, preco_venda=:preco_venda, qtd=:qtd
-            WHERE id=:id AND usuario_id=:usuario_id
-        ");
-        $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-    } else {
-        $stmt = $conn->prepare("
-            INSERT INTO Produto (nome, categoria, preco_custo, preco_venda, qtd, usuario_id)
-            VALUES (:nome, :categoria, :preco_custo, :preco_venda, :qtd, :usuario_id)
-        ");
+    if ($nome && $categoria) {
+        $produto->salvar($id, $nome, $categoria, $preco_custo, $preco_venda, $qtd);
+        header("Location: produtos.php");
+        exit;
     }
-
-    $stmt->bindParam(':nome', $nome);
-    $stmt->bindParam(':categoria', $categoria);
-    $stmt->bindParam(':preco_custo', $preco_custo);
-    $stmt->bindParam(':preco_venda', $preco_venda);
-    $stmt->bindParam(':qtd', $qtd);
-    $stmt->bindParam(':usuario_id', $usuario_id);
-    $stmt->execute();
-
-    header("Location: produtos.php");
-    exit;
 }
 
-// Deletar produto
+// Deletar
 if (isset($_GET['delete'])) {
-    $id = intval($_GET['delete']);
-    $stmt = $conn->prepare("DELETE FROM Produto WHERE id=:id AND usuario_id=:usuario_id");
-    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-    $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
-    $stmt->execute();
+    $produto->deletar(intval($_GET['delete']));
     header("Location: produtos.php");
     exit;
 }
 
-// Buscar produto para edição
-$editarProduto = null;
+// Editar
 if (isset($_GET['edit'])) {
-    $id = intval($_GET['edit']);
-    $stmt = $conn->prepare("SELECT * FROM Produto WHERE id=:id AND usuario_id=:usuario_id");
-    $stmt->bindParam(':id', $id, PDO::PARAM_INT);
-    $stmt->bindParam(':usuario_id', $usuario_id, PDO::PARAM_INT);
-    $stmt->execute();
-    $editarProduto = $stmt->fetch(PDO::FETCH_ASSOC);
+    $editarProduto = $produto->buscar(intval($_GET['edit']));
 }
 
-// Preparar dados para gráfico
+// Listagem
+$produtosLista = $produto->listar();
+
+// Preparar dados gráfico
 $labels = [];
 $precoCustoData = [];
 $precoVendaData = [];
-
-foreach ($produtos as $p) {
+foreach ($produtosLista as $p) {
     $labels[] = $p['nome'];
-    $precoCustoData[] = floatval($p['preco_custo']) * intval($p['qtd']);
-    $precoVendaData[] = floatval($p['preco_venda']) * intval($p['qtd']);
+    $precoCustoData[] = floatval($p['preco_custo'])*intval($p['qtd']);
+    $precoVendaData[] = floatval($p['preco_venda'])*intval($p['qtd']);
 }
 ?>
 
@@ -89,12 +110,13 @@ foreach ($produtos as $p) {
 <body class="bg-light">
 <div class="container mt-4">
 
-    <!-- Cabeçalho com botão no topo direito -->
+    <!-- Cabeçalho -->
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2>Produtos</h2>
         <a href="dashboard.php" class="btn btn-primary">Voltar ao Painel</a>
     </div>
 
+    <!-- Formulário -->
     <form method="post" class="row g-3 mb-4">
         <input type="hidden" name="id" value="<?= $editarProduto['id'] ?? '' ?>">
 
@@ -123,11 +145,12 @@ foreach ($produtos as $p) {
         </div>
     </form>
 
-    <!-- Gráfico de comparação Custo x Venda -->
+    <!-- Gráfico -->
     <div class="bg-white p-3 mb-4 border rounded">
         <canvas id="graficoProdutos" height="100"></canvas>
     </div>
 
+    <!-- Tabela -->
     <table class="table table-bordered bg-white">
         <thead class="table-light">
             <tr>
@@ -141,7 +164,7 @@ foreach ($produtos as $p) {
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($produtos as $p): ?>
+            <?php foreach ($produtosLista as $p): ?>
             <tr>
                 <td><?= $p['id'] ?></td>
                 <td><?= htmlspecialchars($p['nome']) ?></td>
@@ -166,22 +189,11 @@ new Chart(ctx, {
     data: {
         labels: <?= json_encode($labels) ?>,
         datasets: [
-            {
-                label: 'Custo Total',
-                data: <?= json_encode($precoCustoData) ?>,
-                backgroundColor: 'rgba(255, 99, 132, 0.7)'
-            },
-            {
-                label: 'Venda Total',
-                data: <?= json_encode($precoVendaData) ?>,
-                backgroundColor: 'rgba(54, 162, 235, 0.7)'
-            }
+            { label: 'Custo Total do Produto', data: <?= json_encode($precoCustoData) ?>, backgroundColor: 'rgba(255, 99, 132, 0.7)' },
+            { label: 'Venda Total do Produto', data: <?= json_encode($precoVendaData) ?>, backgroundColor: 'rgba(54, 162, 235, 0.7)' }
         ]
     },
-    options: {
-        responsive: true,
-        scales: { y: { beginAtZero: true } }
-    }
+    options: { responsive: true, scales: { y: { beginAtZero: true } } }
 });
 </script>
 
