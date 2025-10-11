@@ -190,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function () {
         doc.text("Detalhes por Produto", 14, yPos);
         yPos += 5;
         
-        // **** CÓDIGO CORRIGIDO AQUI ****
+        
         doc.autoTable({
             html: '#tabela-relatorio',
             startY: yPos,

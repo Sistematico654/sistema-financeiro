@@ -171,7 +171,7 @@ foreach ($produtosLista as $p) {
 
 <!DOCTYPE html>
 <html lang="pt-br">
-<!-- O restante do seu código HTML permanece o mesmo -->
+
 <head>
 <meta charset="UTF-8">
 <title>Custos - Sistema Financeiro</title>

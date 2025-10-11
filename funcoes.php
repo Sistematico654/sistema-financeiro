@@ -23,7 +23,7 @@ function registrar_log(string $acao): void {
         // Pega a instância da conexão do banco de dados
         $conn = Database::getInstance()->getConnection();
 
-        // **CORREÇÃO APLICADA AQUI**
+       
         // Agora usa a chave 'usuario_nome', que é a mesma definida no login.php
         $usuario = $_SESSION['usuario_nome'] ?? 'Sistema';
 

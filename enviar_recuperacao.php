@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $mail = new PHPMailer(true);
             try {
-                // **** CONFIGURAÇÕES DO GMAIL PREENCHIDAS ****
+                
                 $mail->isSMTP();
                 $mail->Host       = 'smtp.gmail.com';
                 $mail->SMTPAuth   = true;

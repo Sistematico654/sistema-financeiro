@@ -95,7 +95,7 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-// Lógica para Editar (sem alterações aqui)
+// Lógica para Editar 
 if (isset($_GET['edit'])) {
     $editarProduto = $produto->buscar(intval($_GET['edit']));
 }
@@ -226,7 +226,7 @@ foreach ($produtosLista as $p) {
                     fillColor: [13, 110, 253]
                 },
                 didParseCell: function(data) {
-                    // Remove a última coluna (Ações) de ser impressa no PDF
+                  
                     if (data.column.index === 6) {
                         data.cell.text = '';
                     }
