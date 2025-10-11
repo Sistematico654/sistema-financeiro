@@ -39,8 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $mail->isSMTP();
                 $mail->Host       = 'smtp.gmail.com';
                 $mail->SMTPAuth   = true;
-                $mail->Username   = 'brunowt360@gmail.com'; // <<< SEU EMAIL
-                $mail->Password   = 'vadyidssjntupeaf';   // <<< SUA SENHA DE APP (sem espaços)
+                $mail->Username   = 'xxxx'; 
+                $mail->Password   = 'xxxx';   
                 $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
                 $mail->Port       = 587;
                 $mail->CharSet    = 'UTF-8';
