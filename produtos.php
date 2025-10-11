@@ -5,10 +5,8 @@ protegerPagina();
 
 $usuario_id = $_SESSION['usuario_id'];
 
-// --- TODA A SUA CLASSE E LÓGICA PHP PERMANECE EXATAMENTE A MESMA ---
-// Classe Produto
+// --- CLASSE PRODUTO MODIFICADA PARA COLABORAÇÃO ---
 class Produto {
-    // ... (seu código da classe produto aqui, sem alterações)
     private $conn;
     private $usuario_id;
 
@@ -17,27 +15,31 @@ class Produto {
         $this->usuario_id = $usuario_id;
     }
 
+    // Alterado: Lista produtos de todos os usuários
     public function listar() {
-        $stmt = $this->conn->prepare("SELECT * FROM Produto WHERE usuario_id=? ORDER BY nome ASC");
-        $stmt->execute([$this->usuario_id]);
+        $stmt = $this->conn->prepare("SELECT * FROM Produto ORDER BY nome ASC");
+        $stmt->execute();
         return $stmt->fetchAll();
     }
 
+    // Alterado: Busca um produto pelo ID, sem verificar o dono
     public function buscar($id) {
-        $stmt = $this->conn->prepare("SELECT * FROM Produto WHERE id=? AND usuario_id=?");
-        $stmt->execute([$id, $this->usuario_id]);
+        $stmt = $this->conn->prepare("SELECT * FROM Produto WHERE id=?");
+        $stmt->execute([$id]);
         return $stmt->fetch();
     }
 
     public function salvar($id, $nome, $categoria, $preco_custo, $preco_venda, $qtd) {
         if ($id) {
+            // Alterado: Permite que qualquer usuário atualize um produto
             $stmt = $this->conn->prepare("
                 UPDATE Produto 
                 SET nome=?, categoria=?, preco_custo=?, preco_venda=?, qtd=? 
-                WHERE id=? AND usuario_id=?
+                WHERE id=?
             ");
-            return $stmt->execute([$nome, $categoria, $preco_custo, $preco_venda, $qtd, $id, $this->usuario_id]);
+            return $stmt->execute([$nome, $categoria, $preco_custo, $preco_venda, $qtd, $id]);
         } else {
+            // Mantido: Ao criar um novo produto, registramos quem o criou
             $stmt = $this->conn->prepare("
                 INSERT INTO Produto (nome, categoria, preco_custo, preco_venda, qtd, usuario_id)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -46,9 +48,10 @@ class Produto {
         }
     }
 
+    // Alterado: Permite que qualquer usuário delete um produto
     public function deletar($id) {
-        $stmt = $this->conn->prepare("DELETE FROM Produto WHERE id=? AND usuario_id=?");
-        return $stmt->execute([$id, $this->usuario_id]);
+        $stmt = $this->conn->prepare("DELETE FROM Produto WHERE id=?");
+        return $stmt->execute([$id]);
     }
 }
 // --- FIM DA CLASSE ---
@@ -56,6 +59,8 @@ class Produto {
 $conn = Database::getInstance()->getConnection();
 $produto = new Produto($conn, $usuario_id);
 $editarProduto = null;
+
+// Lógica para Adicionar/Atualizar (sem alterações aqui)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = $_POST['id'] ?? null;
     $id = $id !== '' ? intval($id) : null;
@@ -76,6 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 }
+
+// Lógica para Deletar (sem alterações aqui)
 if (isset($_GET['delete'])) {
     $id_para_deletar = intval($_GET['delete']);
     $produto_para_deletar = $produto->buscar($id_para_deletar);
@@ -87,17 +94,20 @@ if (isset($_GET['delete'])) {
     header("Location: produtos.php");
     exit;
 }
+
+// Lógica para Editar (sem alterações aqui)
 if (isset($_GET['edit'])) {
     $editarProduto = $produto->buscar(intval($_GET['edit']));
 }
+
 $produtosLista = $produto->listar();
 $labels = [];
 $precoCustoData = [];
 $precoVendaData = [];
 foreach ($produtosLista as $p) {
     $labels[] = $p['nome'];
-    $precoCustoData[] = floatval($p['preco_custo'])*intval($p['qtd']);
-    $precoVendaData[] = floatval($p['preco_venda'])*intval($p['qtd']);
+    $precoCustoData[] = floatval($p['preco_custo']) * intval($p['qtd']);
+    $precoVendaData[] = floatval($p['preco_venda']) * intval($p['qtd']);
 }
 ?>
 <!DOCTYPE html>
@@ -168,53 +178,63 @@ foreach ($produtosLista as $p) {
 </div>
 
 <script>
-const ctx = document.getElementById('graficoProdutos').getContext('2d');
-new Chart(ctx, { /* ... seu código do gráfico ... */
-    type: 'bar', data: { labels: <?= json_encode($labels) ?>, datasets: [ { label: 'Custo Total do Produto', data: <?= json_encode($precoCustoData) ?>, backgroundColor: 'rgba(255, 99, 132, 0.7)' }, { label: 'Venda Total do Produto', data: <?= json_encode($precoVendaData) ?>, backgroundColor: 'rgba(54, 162, 235, 0.7)' } ] }, options: { responsive: true, scales: { y: { beginAtZero: true } } }
-});
-</script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    // Pega o botão de exportar pelo ID que definimos
-    const exportarBtn = document.getElementById('exportar-pdf-btn');
-
-    exportarBtn.addEventListener('click', function () {
-        // Inicializa o jsPDF
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-
-        // Adiciona um título ao PDF
-        doc.text("Relatório de Produtos", 14, 20);
-        doc.setFontSize(10);
-        doc.text("Gerado em: " + new Date().toLocaleString('pt-BR'), 14, 25);
-        
-        // Usa o plugin AutoTable para ler a tabela HTML e desenhar no PDF
-        // Ele é inteligente e vai pular a última coluna "Ações"
-        doc.autoTable({
-            html: '#tabela-produtos',
-            startY: 30, // Posição inicial da tabela, abaixo do título
-            headStyles: { fillColor: [13, 110, 253] }, // Cor do cabeçalho (azul do Bootstrap)
-            columnStyles: {
-                6: { cellWidth: 'wrap' } // Garante que a coluna de ações não seja impressa (ajuste o número se necessário)
-            },
-            didParseCell: function (data) {
-                // Remove a última coluna (Ações) de ser impressa no PDF
-                if (data.column.index === 6) {
-                    data.cell.text = ''; // Limpa o texto da célula
+    // Código do Gráfico
+    const ctx = document.getElementById('graficoProdutos').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: <?= json_encode($labels) ?>,
+            datasets: [{
+                label: 'Custo Total do Produto',
+                data: <?= json_encode($precoCustoData) ?>,
+                backgroundColor: 'rgba(255, 99, 132, 0.7)'
+            }, {
+                label: 'Venda Total do Produto',
+                data: <?= json_encode($precoVendaData) ?>,
+                backgroundColor: 'rgba(54, 162, 235, 0.7)'
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
                 }
             }
-        });
-
-        // Salva o arquivo PDF
-        doc.save('relatorio_de_produtos_<?= date("Y-m-d") ?>.pdf');
+        }
     });
-});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>
+    // Código para Exportar PDF
+    document.addEventListener('DOMContentLoaded', function() {
+        const exportarBtn = document.getElementById('exportar-pdf-btn');
+        exportarBtn.addEventListener('click', function() {
+            const {
+                jsPDF
+            } = window.jspdf;
+            const doc = new jsPDF();
+            doc.text("Relatório de Produtos", 14, 20);
+            doc.setFontSize(10);
+            doc.text("Gerado em: " + new Date().toLocaleString('pt-BR'), 14, 25);
+            doc.autoTable({
+                html: '#tabela-produtos',
+                startY: 30,
+                headStyles: {
+                    fillColor: [13, 110, 253]
+                },
+                didParseCell: function(data) {
+                    // Remove a última coluna (Ações) de ser impressa no PDF
+                    if (data.column.index === 6) {
+                        data.cell.text = '';
+                    }
+                }
+            });
+            doc.save('relatorio_de_produtos_<?= date("Y-m-d") ?>.pdf');
+        });
+    });
 </script>
 
 </body>

@@ -6,7 +6,7 @@ require_once "conexao.php";
 $conn = Database::getInstance()->getConnection();
 $usuario_id = $_SESSION['usuario_id'];
 
-// Classe para gerar relatório simplificado (sem alterações)
+// Classe para gerar relatório simplificado
 class RelatorioSimples {
     private $conn;
     private $usuario_id;
@@ -23,14 +23,14 @@ class RelatorioSimples {
     }
 
     private function carregarProdutos() {
-        $stmt = $this->conn->prepare("SELECT * FROM Produto WHERE usuario_id = ? ORDER BY nome ASC");
-        $stmt->execute([$this->usuario_id]);
+        $stmt = $this->conn->prepare("SELECT * FROM Produto ORDER BY nome ASC");
+        $stmt->execute();
         $this->produtos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     private function carregarDespesas() {
-        $stmt = $this->conn->prepare("SELECT * FROM Custo WHERE usuario_id = ? ORDER BY descricao ASC");
-        $stmt->execute([$this->usuario_id]);
+        $stmt = $this->conn->prepare("SELECT * FROM Custo ORDER BY descricao ASC");
+        $stmt->execute();
         $this->despesas = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -193,14 +193,4 @@ document.addEventListener('DOMContentLoaded', function () {
         doc.autoTable({
             html: '#tabela-relatorio',
             startY: yPos,
-            headStyles: { fillColor: [40, 40, 40] },
-        });
-
-        doc.save('relatorio_viabilidade_<?= date("Y-m-d") ?>.pdf');
-    });
-
-});
-</script>
-
-</body>
-</html>
+            headStyles: { fillColor: [40, 40,

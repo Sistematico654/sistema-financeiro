@@ -5,7 +5,7 @@ protegerPagina();
 
 $usuario_id = $_SESSION['usuario_id'];
 
-// Classes Custo e Produto
+// --- CLASSE CUSTO MODIFICADA PARA COLABORAÇÃO ---
 class Custo {
     private $conn;
     private $usuario_id;
@@ -13,30 +13,36 @@ class Custo {
         $this->conn = $conn;
         $this->usuario_id = $usuario_id;
     }
+
+    // Alterado: Lista custos de todos os usuários
     public function listar() {
         $stmt = $this->conn->prepare("
             SELECT C.*, P.nome AS produto_nome 
             FROM Custo C 
             LEFT JOIN Produto P ON C.produto_id = P.id 
-            WHERE C.usuario_id = ? 
             ORDER BY produto_nome ASC, C.id DESC
         ");
-        $stmt->execute([$this->usuario_id]);
+        $stmt->execute();
         return $stmt->fetchAll();
     }
+
+    // Alterado: Busca um custo pelo ID, sem verificar o dono
     public function buscar($id) {
-        $stmt = $this->conn->prepare("SELECT * FROM Custo WHERE id=? AND usuario_id=?");
-        $stmt->execute([$id, $this->usuario_id]);
+        $stmt = $this->conn->prepare("SELECT * FROM Custo WHERE id=?");
+        $stmt->execute([$id]);
         return $stmt->fetch();
     }
+
     public function salvar($id, $descricao, $valor, $tipo, $produto_id) {
         if ($id) {
+            // Alterado: Permite que qualquer usuário atualize um custo
             $stmt = $this->conn->prepare("
                 UPDATE Custo SET descricao=?, valor=?, tipo=?, produto_id=? 
-                WHERE id=? AND usuario_id=?
+                WHERE id=?
             ");
-            return $stmt->execute([$descricao, $valor, $tipo, $produto_id, $id, $this->usuario_id]);
+            return $stmt->execute([$descricao, $valor, $tipo, $produto_id, $id]);
         } else {
+            // Mantido: Ao criar, registramos quem o criou
             $stmt = $this->conn->prepare("
                 INSERT INTO Custo (descricao, valor, tipo, usuario_id, produto_id)
                 VALUES (?, ?, ?, ?, ?)
@@ -44,12 +50,15 @@ class Custo {
             return $stmt->execute([$descricao, $valor, $tipo, $this->usuario_id, $produto_id]);
         }
     }
+
+    // Alterado: Permite que qualquer usuário delete um custo
     public function deletar($id) {
-        $stmt = $this->conn->prepare("DELETE FROM Custo WHERE id=? AND usuario_id=?");
-        return $stmt->execute([$id, $this->usuario_id]);
+        $stmt = $this->conn->prepare("DELETE FROM Custo WHERE id=?");
+        return $stmt->execute([$id]);
     }
 }
 
+// --- CLASSE PRODUTO MODIFICADA PARA COLABORAÇÃO ---
 class Produto {
     private $conn;
     private $usuario_id;
@@ -57,9 +66,11 @@ class Produto {
         $this->conn = $conn;
         $this->usuario_id = $usuario_id;
     }
+
+    // Alterado: Lista todos os produtos para o dropdown
     public function listar() {
-        $stmt = $this->conn->prepare("SELECT * FROM Produto WHERE usuario_id=? ORDER BY nome ASC");
-        $stmt->execute([$this->usuario_id]);
+        $stmt = $this->conn->prepare("SELECT * FROM Produto ORDER BY nome ASC");
+        $stmt->execute();
         return $stmt->fetchAll();
     }
 }
@@ -84,8 +95,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!in_array($tipo, ['Fixa','Variavel'])) {
         $erro = "Selecione um tipo válido de custo.";
-    } elseif ($descricao && $valor && $tipo && $produto_id) {
-        $custo->salvar($id, $descricao, $valor, $tipo, $produto_id);
+    } elseif ($descricao && $valor && $tipo) { // Removido o 'produto_id' daqui para permitir custos gerais
+        if ($custo->salvar($id, $descricao, $valor, $tipo, $produto_id)) {
+            if ($id) {
+                registrar_log("Atualizou o custo: " . $descricao);
+            } else {
+                registrar_log("Adicionou o novo custo: " . $descricao);
+            }
+        }
         header("Location: custos.php");
         exit;
     } else {
@@ -95,7 +112,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Deletar
 if (isset($_GET['delete'])) {
-    $custo->deletar(intval($_GET['delete']));
+    $id_para_deletar = intval($_GET['delete']);
+    $custo_para_deletar = $custo->buscar($id_para_deletar);
+
+    if ($custo_para_deletar) {
+        if ($custo->deletar($id_para_deletar)) {
+            registrar_log("Deletou o custo: " . $custo_para_deletar['descricao']);
+        }
+    }
     header("Location: custos.php");
     exit;
 }
@@ -109,20 +133,21 @@ if (isset($_GET['edit'])) {
 $despesas = $custo->listar();
 $produtosLista = $produto->listar();
 
-// Preparar dados gráfico: separar fixo, variável e custo do produto
+// Preparar dados gráfico
 $totaisFixos = [];
 $totaisVariaveis = [];
 $totaisProdutos = [];
+$totalProdutosCount = count($produtosLista) > 0 ? count($produtosLista) : 1;
 
 foreach ($produtosLista as $p) {
     $id = $p['id'];
     $totaisFixos[$id] = 0;
     $totaisVariaveis[$id] = 0;
-    $totaisProdutos[$id] = floatval($p['preco_custo']) * intval($p['qtd']); // custo do produto
+    $totaisProdutos[$id] = floatval($p['preco_custo']) * intval($p['qtd']);
 
     foreach ($despesas as $d) {
         if ($d['produto_id'] == $id || is_null($d['produto_id'])) {
-            $valorDistribuido = $d['valor'] / (is_null($d['produto_id']) ? count($produtosLista) : 1);
+            $valorDistribuido = floatval($d['valor']) / (is_null($d['produto_id']) ? $totalProdutosCount : 1);
             if ($d['tipo'] === 'Fixa') {
                 $totaisFixos[$id] += $valorDistribuido;
             } else {
@@ -132,11 +157,11 @@ foreach ($produtosLista as $p) {
     }
 }
 
-// Preparar dados resumidos para tabela resumida
+// Preparar dados resumidos para tabela
 $dadosResumidos = [];
 foreach ($produtosLista as $p) {
     $id = $p['id'];
-    $custoTotal = $totaisFixos[$id] + $totaisVariaveis[$id] + $totaisProdutos[$id];
+    $custoTotal = ($totaisFixos[$id] ?? 0) + ($totaisVariaveis[$id] ?? 0) + ($totaisProdutos[$id] ?? 0);
     $dadosResumidos[] = [
         'produto' => $p['nome'],
         'custoTotal' => $custoTotal
@@ -146,6 +171,7 @@ foreach ($produtosLista as $p) {
 
 <!DOCTYPE html>
 <html lang="pt-br">
+<!-- O restante do seu código HTML permanece o mesmo -->
 <head>
 <meta charset="UTF-8">
 <title>Custos - Sistema Financeiro</title>
@@ -170,8 +196,8 @@ foreach ($produtosLista as $p) {
         <input type="hidden" name="id" value="<?= htmlspecialchars($editarCusto['id'] ?? '') ?>">
 
         <div class="col-md-3">
-            <select name="produto_id" class="form-control" required>
-                <option value="">Selecione o produto</option>
+            <select name="produto_id" class="form-select">
+                <option value="">-- Custo Geral (sem produto) --</option>
                 <?php foreach($produtosLista as $p): ?>
                     <option value="<?= $p['id'] ?>" <?= (isset($editarCusto['produto_id']) && $editarCusto['produto_id'] == $p['id']) ? 'selected' : '' ?>>
                         <?= htmlspecialchars($p['nome']) ?>
@@ -189,7 +215,7 @@ foreach ($produtosLista as $p) {
         </div>
 
         <div class="col-md-2">
-            <select name="tipo" class="form-control" required>
+            <select name="tipo" class="form-select" required>
                 <option value="">Selecione o tipo</option>
                 <option value="Fixa" <?= (isset($editarCusto['tipo']) && $editarCusto['tipo'] === 'Fixa') ? 'selected' : '' ?>>Fixo</option>
                 <option value="Variavel" <?= (isset($editarCusto['tipo']) && $editarCusto['tipo'] === 'Variavel') ? 'selected' : '' ?>>Variável</option>
@@ -226,11 +252,12 @@ foreach ($produtosLista as $p) {
     </table>
 
     <!-- Tabela detalhada de despesas -->
+    <h4>Detalhes dos Custos</h4>
     <table class="table table-bordered bg-white">
         <thead class="table-light">
             <tr>
                 <th>ID</th>
-                <th>Produto</th>
+                <th>Produto Associado</th>
                 <th>Descrição</th>
                 <th>Valor</th>
                 <th>Tipo</th>
@@ -241,7 +268,7 @@ foreach ($produtosLista as $p) {
             <?php foreach($despesas as $d): ?>
             <tr>
                 <td><?= htmlspecialchars($d['id']) ?></td>
-                <td><?= htmlspecialchars($d['produto_nome'] ?? '') ?></td>
+                <td><?= htmlspecialchars($d['produto_nome'] ?? 'Custo Geral') ?></td>
                 <td><?= htmlspecialchars($d['descricao'] ?? '') ?></td>
                 <td>R$ <?= number_format(floatval($d['valor'] ?? 0), 2, ",", ".") ?></td>
                 <td><?= htmlspecialchars($d['tipo'] ?? '') ?></td>
@@ -259,15 +286,9 @@ foreach ($produtosLista as $p) {
 <script>
 const ctx = document.getElementById('graficoCustos').getContext('2d');
 const labels = <?= json_encode(array_map(fn($p) => $p['nome'], $produtosLista)) ?>;
-
-// Custo fixo permanece igual
 const fixosData = <?= json_encode(array_values($totaisFixos)) ?>;
-
-// Custo variável agora inclui o custo do produto (preço_custo * qtd)
-const variaveisData = <?= json_encode(array_map(fn($id) => $totaisVariaveis[$id] + $totaisProdutos[$id], array_keys($totaisProdutos))) ?>;
-
-// Custo total = fixo + variável (já inclui o custo do produto)
-const produtoData = <?= json_encode(array_map(fn($id) => $totaisFixos[$id] + $totaisVariaveis[$id] + $totaisProdutos[$id], array_keys($totaisProdutos))) ?>;
+const variaveisData = <?= json_encode(array_map(fn($id) => ($totaisVariaveis[$id] ?? 0) + ($totaisProdutos[$id] ?? 0), array_keys($totaisProdutos))) ?>;
+const produtoData = <?= json_encode(array_map(fn($id) => ($totaisFixos[$id] ?? 0) + ($totaisVariaveis[$id] ?? 0) + ($totaisProdutos[$id] ?? 0), array_keys($totaisProdutos))) ?>;
 
 new Chart(ctx, {
     type: 'bar',

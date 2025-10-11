@@ -64,6 +64,13 @@ body { background-color: #f8f9fa; }
     <div class="card-body">
         <h3 class="card-title mb-4 text-center">Login</h3>
 
+        <?php
+        if (isset($_SESSION['mensagem_sucesso'])) {
+            echo '<div class="alert alert-success">' . htmlspecialchars($_SESSION['mensagem_sucesso']) . '</div>';
+            unset($_SESSION['mensagem_sucesso']);
+        }
+        ?>
+
         <?php if ($erro): ?>
             <div class="alert alert-danger"><?= htmlspecialchars($erro) ?></div>
         <?php endif; ?>
@@ -86,7 +93,7 @@ body { background-color: #f8f9fa; }
         <p class="mt-3 text-center">
             Não tem conta? <a href="cadastro.php">Cadastre-se</a>
         </p>
-    </div>
+        </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

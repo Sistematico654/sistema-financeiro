@@ -24,18 +24,20 @@ class PontoEquilibrio {
     }
 
     private function carregarProdutos() {
-        $stmt = $this->conn->prepare("SELECT * FROM Produto WHERE usuario_id = ? ORDER BY nome ASC");
-        $stmt->execute([$this->usuario_id]);
+        $stmt = $this->conn->prepare("SELECT * FROM Produto ORDER BY nome ASC");
+        $stmt->execute();
         $this->produtos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     private function carregarDespesas() {
-        $stmt = $this->conn->prepare("SELECT * FROM Custo WHERE usuario_id = ? ORDER BY descricao ASC");
-        $stmt->execute([$this->usuario_id]);
+        $stmt = $this->conn->prepare("SELECT * FROM Custo ORDER BY descricao ASC");
+        $stmt->execute();
         $this->despesas = $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     private function calcularDados() {
+        $totalProdutos = count($this->produtos) > 0 ? count($this->produtos) : 1;
+        
         foreach ($this->produtos as $p) {
             $id = $p['id'];
             $nome = $p['nome'];
@@ -48,7 +50,7 @@ class PontoEquilibrio {
 
             foreach ($this->despesas as $d) {
                 if ($d['produto_id'] == $id || is_null($d['produto_id'])) {
-                    $valorDistribuido = $d['valor'] / (is_null($d['produto_id']) ? count($this->produtos) : 1);
+                    $valorDistribuido = $d['valor'] / (is_null($d['produto_id']) ? $totalProdutos : 1);
                     if ($d['tipo'] === 'Fixa') {
                         $custoFixo += $valorDistribuido;
                     } else {
@@ -56,11 +58,15 @@ class PontoEquilibrio {
                     }
                 }
             }
+            
+            // Custo variável unitário = (soma dos custos variáveis distribuídos / quantidade) + preço de custo do produto
+            $custoVariavelUnitario = ($quantidade > 0 ? ($custoVariavel / $quantidade) : 0) + $preco_custo;
+            
+            // Margem de Contribuição Unitária = Preço de Venda - Custo Variável Unitário
+            $margemContribuicao = $preco_venda - $custoVariavelUnitario;
 
-            $custoVariavelTotal = $custoVariavel + ($preco_custo * $quantidade);
-            $despesasTotaisParaPE = $custoFixo + $custoVariavel;
-            $margemUnidade = $preco_venda - $preco_custo;
-            $pontoEquilibrio = $margemUnidade > 0 ? ceil($despesasTotaisParaPE / $margemUnidade) : 0;
+            // Ponto de Equilíbrio (em unidades) = Custos Fixos Totais / Margem de Contribuição Unitária
+            $pontoEquilibrio = $margemContribuicao > 0 ? ceil($custoFixo / $margemContribuicao) : 0;
 
             $this->dadosTabela[] = [
                 'produto' => $nome,
@@ -110,7 +116,7 @@ $pontoEquilibrioData = array_map(fn($d) => $d['pontoEquilibrio'], $dadosTabela);
             <tr>
                 <th>Produto</th>
                 <th>Quantidade em Estoque</th>
-                <th>Ponto de Equilíbrio (unidades)</th>
+                <th>Ponto de Equilíbrio (unidades a vender)</th>
             </tr>
         </thead>
         <tbody>
@@ -132,8 +138,8 @@ new Chart(ctx, {
     data: {
         labels: <?= json_encode($labels) ?>,
         datasets: [
-            { label: 'Quantidade', data: <?= json_encode($quantidadeData) ?>, backgroundColor: 'rgba(54, 162, 235, 0.7)' },
-            { label: 'Ponto de Equilíbrio', data: <?= json_encode($pontoEquilibrioData) ?>, backgroundColor: 'rgba(255, 99, 132, 0.7)' }
+            { label: 'Quantidade em Estoque', data: <?= json_encode($quantidadeData) ?>, backgroundColor: 'rgba(54, 162, 235, 0.7)' },
+            { label: 'Ponto de Equilíbrio (Unidades)', data: <?= json_encode($pontoEquilibrioData) ?>, backgroundColor: 'rgba(255, 99, 132, 0.7)' }
         ]
     },
     options: {
