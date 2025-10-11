@@ -190,7 +190,18 @@ document.addEventListener('DOMContentLoaded', function () {
         doc.text("Detalhes por Produto", 14, yPos);
         yPos += 5;
         
+        // **** CÓDIGO CORRIGIDO AQUI ****
         doc.autoTable({
             html: '#tabela-relatorio',
             startY: yPos,
-            headStyles: { fillColor: [40, 40,
+            headStyles: { fillColor: [40, 40, 40] },
+        });
+
+        doc.save('relatorio_viabilidade_<?= date("Y-m-d") ?>.pdf');
+    });
+
+});
+</script>
+
+</body>
+</html>
